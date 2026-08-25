@@ -31,7 +31,8 @@ echo 'a -> b' | ./boxl
 `-kitty` draws geometric boxes, arrows, nesting, and labels into a PNG, then
 transmits it directly with the Kitty graphics protocol. It does not rasterize
 the ASCII output. The switch works with stdin, a source file, and `-e`; the
-terminal must support the protocol.
+terminal must support the protocol. Graphical output uses a transparent
+background with white boxes, arrows, and text for dark terminal backgrounds.
 
 When writing directly to a terminal, boxl obtains its physical cell dimensions
 from `TIOCGWINSZ`, with a `CSI 16 t` query as fallback, and renders the PNG at

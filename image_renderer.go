@@ -16,7 +16,7 @@ import (
 )
 
 const (
-	imageFontSize       = 15
+	imageFontSize       = 14
 	imageEmptyBoxSize   = 40
 	imageLeafMinWidth   = 112
 	imageLeafMinHeight  = 52
@@ -36,10 +36,10 @@ const (
 )
 
 var (
-	imageBackground    = color.RGBA{R: 255, G: 255, B: 255, A: 255}
-	imageBoxFill       = color.RGBA{R: 255, G: 255, B: 255, A: 255}
-	imageContainerFill = color.RGBA{R: 246, G: 247, B: 249, A: 255}
-	imageStroke        = color.RGBA{R: 31, G: 35, B: 40, A: 255}
+	imageBackground    = color.RGBA{}
+	imageBoxFill       = color.RGBA{}
+	imageContainerFill = color.RGBA{}
+	imageStroke        = color.RGBA{R: 255, G: 255, B: 255, A: 255}
 )
 
 type imageRenderer struct {

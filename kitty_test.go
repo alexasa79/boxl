@@ -24,9 +24,13 @@ func TestRenderPNG(t *testing.T) {
 	if got, want := image.Bounds().Dy(), 64; got != want {
 		t.Errorf("PNG height = %d, want %d", got, want)
 	}
+	_, _, _, alpha := image.At(0, 0).RGBA()
+	if alpha != 0 {
+		t.Fatalf("PNG background alpha = %#x, want transparent", alpha)
+	}
 	for x := imageOuterMargin; x < imageOuterMargin+imageLeafMinWidth; x++ {
-		red, green, blue, _ := image.At(x, imageOuterMargin).RGBA()
-		if red > 0x4000 || green > 0x4000 || blue > 0x4000 {
+		red, green, blue, alpha := image.At(x, imageOuterMargin).RGBA()
+		if red < 0xe000 || green < 0xe000 || blue < 0xe000 || alpha < 0xe000 {
 			t.Fatalf("box border is not continuous at (%d, %d)", x, imageOuterMargin)
 		}
 	}
@@ -36,22 +40,22 @@ func TestRenderPNG(t *testing.T) {
 	arrowTip := secondLeft - imageArrowBoxGap
 	arrowBase := arrowTip - imageArrowLength
 	for x := firstRight; x <= arrowBase; x++ {
-		red, green, blue, _ := image.At(x, centerY).RGBA()
-		if red > 0x4000 || green > 0x4000 || blue > 0x4000 {
+		red, green, blue, alpha := image.At(x, centerY).RGBA()
+		if red < 0xe000 || green < 0xe000 || blue < 0xe000 || alpha < 0xe000 {
 			t.Fatalf("connection is broken at (%d, %d)", x, centerY)
 		}
 	}
 	for x := arrowTip + 1; x < secondLeft; x++ {
-		red, green, blue, _ := image.At(x, centerY).RGBA()
-		if red < 0xe000 || green < 0xe000 || blue < 0xe000 {
+		_, _, _, alpha := image.At(x, centerY).RGBA()
+		if alpha != 0 {
 			t.Fatalf("arrow does not leave a gap at (%d, %d)", x, centerY)
 		}
 	}
 	hasAntialiasing := false
 	for y := centerY - imageArrowHalfWidth; y <= centerY+imageArrowHalfWidth; y++ {
 		for x := arrowBase; x <= arrowTip; x++ {
-			red, _, _, _ := image.At(x, y).RGBA()
-			if red > 0x4000 && red < 0xe000 {
+			_, _, _, alpha := image.At(x, y).RGBA()
+			if alpha > 0x4000 && alpha < 0xe000 {
 				hasAntialiasing = true
 			}
 		}
@@ -113,8 +117,8 @@ func TestRenderPNGNestedBoxes(t *testing.T) {
 	innerTop := imageOuterMargin + imageContainerPad
 	innerLeft := imageOuterMargin + imageContainerPad
 	for _, point := range [][2]int{{imageOuterMargin, outerTop}, {innerLeft, innerTop}} {
-		red, green, blue, _ := rendered.At(point[0], point[1]).RGBA()
-		if red > 0x4000 || green > 0x4000 || blue > 0x4000 {
+		red, green, blue, alpha := rendered.At(point[0], point[1]).RGBA()
+		if red < 0xe000 || green < 0xe000 || blue < 0xe000 || alpha < 0xe000 {
 			t.Fatalf("expected geometric border at (%d, %d)", point[0], point[1])
 		}
 	}
