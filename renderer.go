@@ -95,38 +95,50 @@ func (r *Renderer) renderScope(m *model, scope *declaredBox, metrics leafMetrics
 		boxCanvases[box] = rendered
 	}
 
-	ranks, err := layoutRanks(children, m.connections(scope), scope)
+	edges := m.connections(scope)
+	grid, err := layoutBoxes(children, m.layoutConstraints(scope), edges, scope)
 	if err != nil {
 		return nil, err
 	}
-	maxRank := 0
-	for _, rank := range ranks {
-		maxRank = max(maxRank, rank)
+	maxColumn, maxRow := 0, 0
+	for _, position := range grid {
+		maxColumn = max(maxColumn, position.column)
+		maxRow = max(maxRow, position.row)
 	}
-	columnWidths := make([]int, maxRank+1)
+	columnWidths := make([]int, maxColumn+1)
+	rowHeights := make([]int, maxRow+1)
 	for _, box := range children {
-		columnWidths[ranks[box]] = max(columnWidths[ranks[box]], boxCanvases[box].width)
+		position := grid[box]
+		columnWidths[position.column] = max(columnWidths[position.column], boxCanvases[box].width)
+		rowHeights[position.row] = max(rowHeights[position.row], boxCanvases[box].height)
 	}
 	columnX := make([]int, len(columnWidths))
-	for rank := 1; rank < len(columnX); rank++ {
-		columnX[rank] = columnX[rank-1] + columnWidths[rank-1] + r.options.HorizontalGap
+	for column := 1; column < len(columnX); column++ {
+		columnX[column] = columnX[column-1] + columnWidths[column-1] + r.options.HorizontalGap
+	}
+	rowY := make([]int, len(rowHeights))
+	for row := 1; row < len(rowY); row++ {
+		rowY[row] = rowY[row-1] + rowHeights[row-1] + r.options.VerticalGap
 	}
 
 	placements := make(map[*declaredBox]placement, len(children))
-	columnY := make([]int, len(columnWidths))
 	width := 0
 	height := 0
 	for _, box := range children {
-		rank := ranks[box]
-		item := placement{x: columnX[rank], y: columnY[rank], canvas: boxCanvases[box]}
+		position := grid[box]
+		boxCanvas := boxCanvases[box]
+		item := placement{
+			x:      columnX[position.column] + (columnWidths[position.column]-boxCanvas.width)/2,
+			y:      rowY[position.row] + (rowHeights[position.row]-boxCanvas.height)/2,
+			canvas: boxCanvas,
+		}
 		placements[box] = item
-		columnY[rank] += item.canvas.height + r.options.VerticalGap
 		width = max(width, item.x+item.canvas.width)
 		height = max(height, item.y+item.canvas.height)
 	}
 
 	result := newCanvas(width, height)
-	for _, edge := range m.connections(scope) {
+	for _, edge := range edges {
 		r.drawConnection(result, placements[edge.from], placements[edge.to])
 	}
 	for _, box := range children {
@@ -163,82 +175,96 @@ func (r *Renderer) containerCanvas(inside *canvas) *canvas {
 }
 
 func (r *Renderer) drawConnection(target *canvas, from, to placement) {
-	fromX := from.x + from.canvas.width - 1
-	fromY := from.y + from.canvas.height/2
-	toX := to.x
-	toY := to.y + to.canvas.height/2
-	startX := fromX + 1
-	endX := toX - 1
-	if endX-startX >= 2 {
-		startX++
-		endX--
+	fromCenterX := from.x + from.canvas.width/2
+	fromCenterY := from.y + from.canvas.height/2
+	toCenterX := to.x + to.canvas.width/2
+	toCenterY := to.y + to.canvas.height/2
+	if abs(toCenterX-fromCenterX) >= abs(toCenterY-fromCenterY) {
+		if toCenterX >= fromCenterX {
+			r.drawHorizontalConnection(target,
+				from.x+from.canvas.width-1, fromCenterY, to.x, toCenterY, 1, '>')
+		} else {
+			r.drawHorizontalConnection(target,
+				from.x, fromCenterY, to.x+to.canvas.width-1, toCenterY, -1, '<')
+		}
+		return
 	}
-	if startX > endX {
+	if toCenterY >= fromCenterY {
+		r.drawVerticalConnection(target,
+			fromCenterX, from.y+from.canvas.height-1, toCenterX, to.y, 1, 'v')
+	} else {
+		r.drawVerticalConnection(target,
+			fromCenterX, from.y, toCenterX, to.y+to.canvas.height-1, -1, '^')
+	}
+}
+
+func (r *Renderer) drawHorizontalConnection(target *canvas, fromX, fromY, toX, toY, direction int, arrow rune) {
+	startX := fromX + direction
+	endX := toX - direction
+	if (endX-startX)*direction >= 2 {
+		startX += direction
+		endX -= direction
+	}
+	if (endX-startX)*direction < 0 {
 		return
 	}
 	if fromY == toY {
-		for x := startX; x < endX; x++ {
-			target.connector(x, fromY, '-')
-		}
-		target.connector(endX, toY, '>')
+		drawCanvasHorizontal(target, startX, endX, fromY)
+		target.connector(endX, toY, arrow)
 		return
 	}
-
 	middleX := (startX + endX) / 2
-	for x := startX; x <= middleX; x++ {
-		target.connector(x, fromY, '-')
-	}
-	minY, maxY := fromY, toY
-	if minY > maxY {
-		minY, maxY = maxY, minY
-	}
-	for y := minY; y <= maxY; y++ {
-		target.connector(middleX, y, '|')
-	}
-	for x := middleX; x < endX; x++ {
-		target.connector(x, toY, '-')
-	}
-	target.connector(endX, toY, '>')
+	drawCanvasHorizontal(target, startX, middleX, fromY)
+	drawCanvasVertical(target, middleX, fromY, toY)
+	drawCanvasHorizontal(target, middleX, endX, toY)
+	target.connector(endX, toY, arrow)
 }
 
-func layoutRanks(children []*declaredBox, edges []connection, scope *declaredBox) (map[*declaredBox]int, error) {
-	ranks := make(map[*declaredBox]int, len(children))
-	indegree := make(map[*declaredBox]int, len(children))
-	adjacency := make(map[*declaredBox][]*declaredBox, len(children))
-	for _, box := range children {
-		indegree[box] = 0
+func (r *Renderer) drawVerticalConnection(target *canvas, fromX, fromY, toX, toY, direction int, arrow rune) {
+	startY := fromY + direction
+	endY := toY - direction
+	if (endY-startY)*direction >= 2 {
+		startY += direction
+		endY -= direction
 	}
-	for _, edge := range edges {
-		adjacency[edge.from] = append(adjacency[edge.from], edge.to)
-		indegree[edge.to]++
+	if (endY-startY)*direction < 0 {
+		return
 	}
-	queue := make([]*declaredBox, 0, len(children))
-	for _, box := range children {
-		if indegree[box] == 0 {
-			queue = append(queue, box)
-		}
+	if fromX == toX {
+		drawCanvasVertical(target, fromX, startY, endY)
+		target.connector(toX, endY, arrow)
+		return
 	}
-	processed := 0
-	for len(queue) > 0 {
-		box := queue[0]
-		queue = queue[1:]
-		processed++
-		for _, next := range adjacency[box] {
-			ranks[next] = max(ranks[next], ranks[box]+1)
-			indegree[next]--
-			if indegree[next] == 0 {
-				queue = append(queue, next)
-			}
-		}
+	middleY := (startY + endY) / 2
+	drawCanvasVertical(target, fromX, startY, middleY)
+	drawCanvasHorizontal(target, fromX, toX, middleY)
+	drawCanvasVertical(target, toX, middleY, endY)
+	target.connector(toX, endY, arrow)
+}
+
+func drawCanvasHorizontal(target *canvas, x1, x2, y int) {
+	if x1 > x2 {
+		x1, x2 = x2, x1
 	}
-	if processed != len(children) {
-		where := "top-level diagram"
-		if scope != nil {
-			where = fmt.Sprintf("container %q", scope.name)
-		}
-		return nil, fmt.Errorf("cannot lay out connection cycle in %s", where)
+	for x := x1; x <= x2; x++ {
+		target.connector(x, y, '-')
 	}
-	return ranks, nil
+}
+
+func drawCanvasVertical(target *canvas, x, y1, y2 int) {
+	if y1 > y2 {
+		y1, y2 = y2, y1
+	}
+	for y := y1; y <= y2; y++ {
+		target.connector(x, y, '|')
+	}
+}
+
+func abs(value int) int {
+	if value < 0 {
+		return -value
+	}
+	return value
 }
 
 func labelLines(text *string) []string {

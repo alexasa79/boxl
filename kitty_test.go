@@ -104,6 +104,58 @@ func TestRenderPNGExpandsForMultilineText(t *testing.T) {
 	}
 }
 
+func TestRenderPNGUsesWhitespaceLayout(t *testing.T) {
+	data, err := RenderPNG("a b\nc d")
+	if err != nil {
+		t.Fatal(err)
+	}
+	rendered, err := png.Decode(bytes.NewReader(data))
+	if err != nil {
+		t.Fatal(err)
+	}
+	wantWidth := 2*imageEmptyBoxSize + imageHorizontalGap + 2*imageOuterMargin
+	wantHeight := 2*imageEmptyBoxSize + imageVerticalGap + 2*imageOuterMargin
+	if rendered.Bounds().Dx() != wantWidth || rendered.Bounds().Dy() != wantHeight {
+		t.Fatalf("PNG size = %v, want %dx%d", rendered.Bounds(), wantWidth, wantHeight)
+	}
+}
+
+func TestRenderPNGRoutesConstrainedConnections(t *testing.T) {
+	tests := []struct {
+		name       string
+		constraint string
+		gapX       int
+		gapY       int
+		tipX       int
+		tipY       int
+	}{
+		{"right", "left-of", imageOuterMargin + imageEmptyBoxSize + imageHorizontalGap - 1, imageOuterMargin + imageEmptyBoxSize/2, imageOuterMargin + imageEmptyBoxSize + imageHorizontalGap - 2, imageOuterMargin + imageEmptyBoxSize/2},
+		{"left", "right-of", imageOuterMargin + imageEmptyBoxSize, imageOuterMargin + imageEmptyBoxSize/2, imageOuterMargin + imageEmptyBoxSize + 1, imageOuterMargin + imageEmptyBoxSize/2},
+		{"down", "above", imageOuterMargin + imageEmptyBoxSize/2, imageOuterMargin + imageEmptyBoxSize + imageVerticalGap - 1, imageOuterMargin + imageEmptyBoxSize/2, imageOuterMargin + imageEmptyBoxSize + imageVerticalGap - 2},
+		{"up", "below", imageOuterMargin + imageEmptyBoxSize/2, imageOuterMargin + imageEmptyBoxSize, imageOuterMargin + imageEmptyBoxSize/2, imageOuterMargin + imageEmptyBoxSize + 1},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			data, err := RenderPNG("a -> b\na@" + test.constraint + " b")
+			if err != nil {
+				t.Fatal(err)
+			}
+			rendered, err := png.Decode(bytes.NewReader(data))
+			if err != nil {
+				t.Fatal(err)
+			}
+			_, _, _, gapAlpha := rendered.At(test.gapX, test.gapY).RGBA()
+			if gapAlpha != 0 {
+				t.Errorf("pixel next to target has alpha %#x, want transparent", gapAlpha)
+			}
+			_, _, _, tipAlpha := rendered.At(test.tipX, test.tipY).RGBA()
+			if tipAlpha == 0 {
+				t.Errorf("arrow tip at (%d, %d) is transparent", test.tipX, test.tipY)
+			}
+		})
+	}
+}
+
 func TestRenderPNGNestedBoxes(t *testing.T) {
 	data, err := RenderPNG("outer[inner]")
 	if err != nil {

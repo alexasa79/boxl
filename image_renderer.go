@@ -57,8 +57,10 @@ type imageRenderer struct {
 	horizontalGap     int
 	verticalGap       int
 	lineWidth         int
-	arrowLength       int
-	arrowHalfWidth    int
+	arrowLengthX      int
+	arrowLengthY      int
+	arrowHalfWidthX   int
+	arrowHalfWidthY   int
 	outerMarginX      int
 	outerMarginY      int
 }
@@ -178,8 +180,10 @@ func newImageRenderer(scaleX, scaleY float64) (*imageRenderer, error) {
 		horizontalGap:     scaledPixel(imageHorizontalGap, scaleX),
 		verticalGap:       scaledPixel(imageVerticalGap, scaleY),
 		lineWidth:         scaledPixel(imageLineWidth, strokeScale),
-		arrowLength:       scaledPixel(imageArrowLength, scaleX),
-		arrowHalfWidth:    scaledPixel(imageArrowHalfWidth, scaleY),
+		arrowLengthX:      scaledPixel(imageArrowLength, scaleX),
+		arrowLengthY:      scaledPixel(imageArrowLength, scaleY),
+		arrowHalfWidthX:   scaledPixel(imageArrowHalfWidth, scaleX),
+		arrowHalfWidthY:   scaledPixel(imageArrowHalfWidth, scaleY),
 		outerMarginX:      scaledPixel(imageOuterMargin, scaleX),
 		outerMarginY:      scaledPixel(imageOuterMargin, scaleY),
 	}, nil
@@ -224,32 +228,43 @@ func (r *imageRenderer) renderScope(m *model, scope *declaredBox, metrics imageL
 	}
 
 	edges := m.connections(scope)
-	ranks, err := layoutRanks(children, edges, scope)
+	grid, err := layoutBoxes(children, m.layoutConstraints(scope), edges, scope)
 	if err != nil {
 		return nil, err
 	}
-	maxRank := 0
-	for _, rank := range ranks {
-		maxRank = max(maxRank, rank)
+	maxColumn, maxRow := 0, 0
+	for _, position := range grid {
+		maxColumn = max(maxColumn, position.column)
+		maxRow = max(maxRow, position.row)
 	}
-	columnWidths := make([]int, maxRank+1)
+	columnWidths := make([]int, maxColumn+1)
+	rowHeights := make([]int, maxRow+1)
 	for _, box := range children {
-		columnWidths[ranks[box]] = max(columnWidths[ranks[box]], boxImages[box].Bounds().Dx())
+		position := grid[box]
+		boxBounds := boxImages[box].Bounds()
+		columnWidths[position.column] = max(columnWidths[position.column], boxBounds.Dx())
+		rowHeights[position.row] = max(rowHeights[position.row], boxBounds.Dy())
 	}
 	columnX := make([]int, len(columnWidths))
-	for rank := 1; rank < len(columnX); rank++ {
-		columnX[rank] = columnX[rank-1] + columnWidths[rank-1] + r.horizontalGap
+	for column := 1; column < len(columnX); column++ {
+		columnX[column] = columnX[column-1] + columnWidths[column-1] + r.horizontalGap
+	}
+	rowY := make([]int, len(rowHeights))
+	for row := 1; row < len(rowY); row++ {
+		rowY[row] = rowY[row-1] + rowHeights[row-1] + r.verticalGap
 	}
 
 	placements := make(map[*declaredBox]imagePlacement, len(children))
-	columnY := make([]int, len(columnWidths))
 	width, height := 0, 0
 	for _, box := range children {
-		rank := ranks[box]
+		position := grid[box]
 		boxImage := boxImages[box]
-		placement := imagePlacement{x: columnX[rank], y: columnY[rank], image: boxImage}
+		placement := imagePlacement{
+			x:     columnX[position.column] + (columnWidths[position.column]-boxImage.Bounds().Dx())/2,
+			y:     rowY[position.row] + (rowHeights[position.row]-boxImage.Bounds().Dy())/2,
+			image: boxImage,
+		}
 		placements[box] = placement
-		columnY[rank] += boxImage.Bounds().Dy() + r.verticalGap
 		width = max(width, placement.x+boxImage.Bounds().Dx())
 		height = max(height, placement.y+boxImage.Bounds().Dy())
 	}
@@ -315,21 +330,44 @@ func (r *imageRenderer) drawImageBox(target *image.RGBA, fill color.Color) {
 }
 
 func (r *imageRenderer) drawImageConnection(target *image.RGBA, from, to imagePlacement) {
-	fromX := from.x + from.image.Bounds().Dx() - 1
-	fromY := from.y + from.image.Bounds().Dy()/2
-	toX := to.x
-	toY := to.y + to.image.Bounds().Dy()/2
-	arrowTip := toX - imageArrowBoxGap
-	lineEnd := arrowTip - r.arrowLength
-	if fromY == toY {
-		r.drawHorizontalImageLine(target, fromX, lineEnd, fromY)
-	} else {
-		middleX := (fromX + lineEnd) / 2
-		r.drawHorizontalImageLine(target, fromX, middleX, fromY)
-		r.drawVerticalImageLine(target, middleX, fromY, toY)
-		r.drawHorizontalImageLine(target, middleX, lineEnd, toY)
+	fromCenterX := from.x + from.image.Bounds().Dx()/2
+	fromCenterY := from.y + from.image.Bounds().Dy()/2
+	toCenterX := to.x + to.image.Bounds().Dx()/2
+	toCenterY := to.y + to.image.Bounds().Dy()/2
+	if abs(toCenterX-fromCenterX) >= abs(toCenterY-fromCenterY) {
+		direction := 1
+		fromX := from.x + from.image.Bounds().Dx() - 1
+		toX := to.x
+		if toCenterX < fromCenterX {
+			direction = -1
+			fromX = from.x
+			toX = to.x + to.image.Bounds().Dx() - 1
+		}
+		tipX := toX - direction*imageArrowBoxGap
+		baseX := tipX - direction*r.arrowLengthX
+		middleX := (fromX + baseX) / 2
+		r.drawHorizontalImageLine(target, fromX, middleX, fromCenterY)
+		r.drawVerticalImageLine(target, middleX, fromCenterY, toCenterY)
+		r.drawHorizontalImageLine(target, middleX, baseX, toCenterY)
+		r.drawImageArrowhead(target, tipX, toCenterY, direction, 0, r.arrowLengthX, r.arrowHalfWidthY)
+		return
 	}
-	r.drawImageArrowhead(target, arrowTip, toY)
+
+	direction := 1
+	fromY := from.y + from.image.Bounds().Dy() - 1
+	toY := to.y
+	if toCenterY < fromCenterY {
+		direction = -1
+		fromY = from.y
+		toY = to.y + to.image.Bounds().Dy() - 1
+	}
+	tipY := toY - direction*imageArrowBoxGap
+	baseY := tipY - direction*r.arrowLengthY
+	middleY := (fromY + baseY) / 2
+	r.drawVerticalImageLine(target, fromCenterX, fromY, middleY)
+	r.drawHorizontalImageLine(target, fromCenterX, toCenterX, middleY)
+	r.drawVerticalImageLine(target, toCenterX, middleY, baseY)
+	r.drawImageArrowhead(target, toCenterX, tipY, 0, direction, r.arrowLengthY, r.arrowHalfWidthX)
 }
 
 func (r *imageRenderer) drawHorizontalImageLine(target *image.RGBA, x1, x2, y int) {
@@ -346,12 +384,15 @@ func (r *imageRenderer) drawVerticalImageLine(target *image.RGBA, x, y1, y2 int)
 	fillRectangle(target, image.Rect(x-r.lineWidth/2, y1, x+(r.lineWidth+1)/2, y2+1), imageStroke)
 }
 
-func (r *imageRenderer) drawImageArrowhead(target *image.RGBA, tipX, centerY int) {
-	baseX := tipX - r.arrowLength
+func (r *imageRenderer) drawImageArrowhead(target *image.RGBA, tipX, tipY, directionX, directionY, length, halfWidth int) {
+	baseX := tipX - directionX*length
+	baseY := tipY - directionY*length
+	perpendicularX := -directionY * halfWidth
+	perpendicularY := directionX * halfWidth
 	rasterizer := vector.NewRasterizer(target.Bounds().Dx(), target.Bounds().Dy())
-	rasterizer.MoveTo(float32(tipX)+0.5, float32(centerY)+0.5)
-	rasterizer.LineTo(float32(baseX)+0.5, float32(centerY-r.arrowHalfWidth)+0.5)
-	rasterizer.LineTo(float32(baseX)+0.5, float32(centerY+r.arrowHalfWidth)+0.5)
+	rasterizer.MoveTo(float32(tipX)+0.5, float32(tipY)+0.5)
+	rasterizer.LineTo(float32(baseX+perpendicularX)+0.5, float32(baseY+perpendicularY)+0.5)
+	rasterizer.LineTo(float32(baseX-perpendicularX)+0.5, float32(baseY-perpendicularY)+0.5)
 	rasterizer.ClosePath()
 	rasterizer.Draw(target, target.Bounds(), image.NewUniform(imageStroke), image.Point{})
 }

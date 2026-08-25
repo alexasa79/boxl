@@ -2,7 +2,7 @@
 
 `boxl` is a small Go library and command-line renderer for the box language.
 It tokenizes and parses source into an AST, collects global box declarations in
-a first rendering pass, then performs horizontal layout and ASCII rendering in a
+a first rendering pass, then performs constraint layout and rendering in a
 second pass.
 
 ```text
@@ -16,6 +16,42 @@ renders as:
 | request  | --> | response |
 +----------+     +----------+
 ```
+
+## Layout constraints
+
+`->` only declares connections. Whitespace describes relative placement:
+
+```text
+a["input"] -> b["process"]
+
+a b
+```
+
+Boxes on one line are arranged from left to right. Consecutive layout lines
+form rows, with boxes in matching columns arranged from top to bottom. Thus
+`a b` is shorthand for `a@then b`, while `a` followed by `b` on the next line
+is shorthand for `a@above b`. A blank line or the end of the containing diagram
+ends a whitespace layout description. Arrow statements are not layout rows and
+separate adjacent layout descriptions.
+
+```text
+a b
+c d
+```
+
+The example above forms a two-row, two-column layout.
+
+The explicit `@` form remains available. Constraints are read relative to the
+box before `@`:
+
+- `then d` and `left-of d` place `d` to its right.
+- `right-of d` places it to the right of `d`.
+- `above d` and `below d` place it vertically relative to `d`.
+
+Horizontal constraints align box centers vertically; vertical constraints
+align them horizontally. Spacing and all unconstrained placement remain
+automatic. Multiple declarations of a box accumulate constraints, and
+constraints may only refer to boxes in the same container.
 
 ## Command line
 
@@ -71,7 +107,8 @@ Use `NewRenderer` with `RenderOptions` when custom spacing is needed.
   indentation are preserved, and Go-style escapes remain supported.
 - Repeating the same text declaration is allowed. Conflicting text, combining
   text with nested content, multiple containers for one box, boundary-crossing
-  connections, and connection cycles are reported as errors.
+  connections or constraints, and contradictory layout constraints are
+  reported as errors.
 - Text output gives all leaf boxes the same dimensions. Graphical output uses
   compact 40x40 pixel boxes when they have no text; labeled leaves share the
   same dimensions. Container boxes expand recursively around their contents.

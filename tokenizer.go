@@ -17,6 +17,8 @@ const (
 	TokenArrow
 	TokenLeftBracket
 	TokenRightBracket
+	TokenAt
+	TokenComma
 	TokenNewline
 	TokenEOF
 )
@@ -33,6 +35,10 @@ func (t TokenType) String() string {
 		return "["
 	case TokenRightBracket:
 		return "]"
+	case TokenAt:
+		return "@"
+	case TokenComma:
+		return ","
 	case TokenNewline:
 		return "newline"
 	case TokenEOF:
@@ -119,6 +125,14 @@ func (t *Tokenizer) Next() (Token, error) {
 		t.offset++
 		t.column++
 		return Token{Type: TokenRightBracket, Lexeme: "]", Position: start}, nil
+	case '@':
+		t.offset++
+		t.column++
+		return Token{Type: TokenAt, Lexeme: "@", Position: start}, nil
+	case ',':
+		t.offset++
+		t.column++
+		return Token{Type: TokenComma, Lexeme: ",", Position: start}, nil
 	case '-':
 		if t.offset+1 < len(t.input) && t.input[t.offset+1] == '>' {
 			t.offset += 2

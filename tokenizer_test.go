@@ -37,7 +37,7 @@ func TestTokenize(t *testing.T) {
 }
 
 func TestTokenizerReportsSourcePosition(t *testing.T) {
-	_, err := Tokenize("a -> b\n  @")
+	_, err := Tokenize("a -> b\n  $")
 	if err == nil || !strings.Contains(err.Error(), "line 2, column 3") {
 		t.Fatalf("error = %v", err)
 	}
@@ -70,5 +70,24 @@ func TestTokenizeMultilineQuotedText(t *testing.T) {
 	}
 	if got := tokens[4].Position; got.Line != 2 || got.Column != 19 {
 		t.Fatalf("arrow position = %+v", got)
+	}
+}
+
+func TestTokenizeLayoutConstraints(t *testing.T) {
+	tokens, err := Tokenize("a@then b,below c")
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []TokenType{
+		TokenIdentifier, TokenAt, TokenIdentifier, TokenIdentifier, TokenComma,
+		TokenIdentifier, TokenIdentifier, TokenEOF,
+	}
+	if len(tokens) != len(want) {
+		t.Fatalf("got %d tokens, want %d", len(tokens), len(want))
+	}
+	for i, tokenType := range want {
+		if tokens[i].Type != tokenType {
+			t.Errorf("token %d = %s, want %s", i, tokens[i].Type, tokenType)
+		}
 	}
 }

@@ -30,7 +30,7 @@ func (c *canvas) connector(x, y int, value rune) {
 		return
 	}
 	existing := c.cells[y][x]
-	if value == '>' {
+	if strings.ContainsRune("<>^v", value) {
 		c.cells[y][x] = value
 		return
 	}
@@ -38,7 +38,7 @@ func (c *canvas) connector(x, y int, value rune) {
 		c.cells[y][x] = value
 		return
 	}
-	if existing == '>' {
+	if strings.ContainsRune("<>^v", existing) {
 		return
 	}
 	c.cells[y][x] = '+'
