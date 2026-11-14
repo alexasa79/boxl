@@ -52,15 +52,15 @@ func TestLayoutRejectsContradictoryConstraints(t *testing.T) {
 		"a@left-of b\nb@above a",
 	}
 	for _, source := range tests {
-		_, err := Render(source)
+		_, err := RenderPNG(source)
 		if err == nil || !strings.Contains(err.Error(), "layout constraint") {
-			t.Errorf("Render(%q) error = %v", source, err)
+			t.Errorf("RenderPNG(%q) error = %v", source, err)
 		}
 	}
 }
 
 func TestLayoutConstraintCannotCrossContainerBoundary(t *testing.T) {
-	_, err := Render("outer[a]\nc@below a")
+	_, err := RenderPNG("outer[a]\nc@below a")
 	if err == nil || !strings.Contains(err.Error(), "crosses the boundary") {
 		t.Fatalf("error = %v", err)
 	}

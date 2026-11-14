@@ -24,7 +24,7 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) error {
 	flags.SetOutput(stderr)
 	inline := flags.String("e", "", "render inline box language source")
 	kitty := flags.Bool("kitty", false, "display as an image using the Kitty graphics protocol")
-	outputPath := flags.String("o", "", "write output to file")
+	outputPath := flags.String("o", "", "write output to file (default out.png without -kitty)")
 	flags.Usage = func() {
 		fmt.Fprintln(stderr, "usage: boxl [-kitty] [-o output] [file]")
 		fmt.Fprintln(stderr, "       boxl [-kitty] [-o output] -e 'a -> b'")
@@ -64,9 +64,8 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) error {
 	}
 
 	var rendered bytes.Buffer
-	transform := boxl.Transform
 	if *kitty {
-		transform = boxl.TransformKitty
+		transform := boxl.TransformKitty
 		if *outputPath == "" {
 			if cellSize, ok := detectKittyCellSize(stdout); ok {
 				transform = func(input io.Reader, output io.Writer) error {
@@ -74,9 +73,22 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) error {
 				}
 			}
 		}
-	}
-	if err := transform(input, &rendered); err != nil {
-		return err
+		if err := transform(input, &rendered); err != nil {
+			return err
+		}
+	} else {
+		source, err := io.ReadAll(input)
+		if err != nil {
+			return fmt.Errorf("read box language: %w", err)
+		}
+		pngData, err := boxl.RenderPNG(string(source))
+		if err != nil {
+			return err
+		}
+		rendered.Write(pngData)
+		if *outputPath == "" {
+			*outputPath = "out.png"
+		}
 	}
 	if *outputPath == "" {
 		_, err := rendered.WriteTo(stdout)

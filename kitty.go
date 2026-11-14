@@ -18,12 +18,6 @@ func (s KittyCellSize) valid() bool {
 	return s.Width > 0 && s.Height > 0
 }
 
-// RenderPNG renders source into a PNG suitable for graphical frontends. Empty
-// source produces an empty byte slice.
-func RenderPNG(source string) ([]byte, error) {
-	return renderPNGSource(source)
-}
-
 // TransformKitty reads box language source and writes a Kitty graphics
 // protocol sequence that transmits and displays the rendered diagram.
 func TransformKitty(input io.Reader, output io.Writer) error {

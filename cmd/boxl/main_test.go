@@ -2,23 +2,52 @@ package main
 
 import (
 	"bytes"
+	"image/png"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"boxl"
 )
 
-func TestRunInlineSource(t *testing.T) {
-	var stdout, stderr bytes.Buffer
-	if err := run([]string{"-e", "a -> b"}, strings.NewReader(""), &stdout, &stderr); err != nil {
-		t.Fatal(err)
-	}
-	if !strings.Contains(stdout.String(), "-->") {
-		t.Fatalf("stdout = %q", stdout.String())
+func TestRunDefaultsToPNGFile(t *testing.T) {
+	for _, mode := range []string{"inline", "stdin", "file"} {
+		t.Run(mode, func(t *testing.T) {
+			t.Chdir(t.TempDir())
+			var args []string
+			stdin := ""
+			switch mode {
+			case "inline":
+				args = []string{"-e", "a -> b"}
+			case "stdin":
+				stdin = "a -> b"
+			case "file":
+				if err := os.WriteFile("diagram.boxl", []byte("a -> b"), 0o600); err != nil {
+					t.Fatal(err)
+				}
+				args = []string{"diagram.boxl"}
+			}
+			var stdout, stderr bytes.Buffer
+			if err := run(args, strings.NewReader(stdin), &stdout, &stderr); err != nil {
+				t.Fatal(err)
+			}
+			output, err := os.ReadFile("out.png")
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err := png.Decode(bytes.NewReader(output)); err != nil {
+				t.Fatalf("out.png is not a valid PNG: %v", err)
+			}
+			if stdout.Len() != 0 {
+				t.Fatalf("stdout = %q", stdout.String())
+			}
+		})
 	}
 }
 
 func TestRunEmptyInlineSourceDoesNotReadStdin(t *testing.T) {
+	t.Chdir(t.TempDir())
 	var stdout, stderr bytes.Buffer
 	if err := run([]string{"-e", ""}, nil, &stdout, &stderr); err != nil {
 		t.Fatal(err)
@@ -52,7 +81,7 @@ func TestRunKittyImageWithMultilineText(t *testing.T) {
 func TestRunReadsAndWritesFiles(t *testing.T) {
 	directory := t.TempDir()
 	inputPath := filepath.Join(directory, "diagram.boxl")
-	outputPath := filepath.Join(directory, "diagram.txt")
+	outputPath := filepath.Join(directory, "diagram.png")
 	if err := os.WriteFile(inputPath, []byte("a[\"file\"]"), 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -64,8 +93,12 @@ func TestRunReadsAndWritesFiles(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(string(output), "file") {
-		t.Fatalf("output file = %q", output)
+	want, err := boxl.RenderPNG("a[\"file\"]")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(output, want) {
+		t.Fatal("output file does not match the rendered PNG")
 	}
 	if stdout.Len() != 0 {
 		t.Fatalf("stdout = %q", stdout.String())

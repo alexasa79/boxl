@@ -7,6 +7,7 @@ import (
 	"image/color"
 	"image/draw"
 	"image/png"
+	"strings"
 
 	"golang.org/x/image/font"
 	"golang.org/x/image/font/gofont/goregular"
@@ -403,4 +404,18 @@ func fillImage(target *image.RGBA, fill color.Color) {
 
 func fillRectangle(target *image.RGBA, rectangle image.Rectangle, fill color.Color) {
 	draw.Draw(target, rectangle.Intersect(target.Bounds()), image.NewUniform(fill), image.Point{}, draw.Src)
+}
+
+func abs(value int) int {
+	if value < 0 {
+		return -value
+	}
+	return value
+}
+
+func labelLines(text *string) []string {
+	if text == nil {
+		return []string{""}
+	}
+	return strings.Split(strings.ReplaceAll(*text, "\t", "    "), "\n")
 }

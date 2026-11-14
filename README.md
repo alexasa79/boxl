@@ -9,13 +9,7 @@ second pass.
 a["request"] -> b["response"]
 ```
 
-renders as:
-
-```text
-+----------+     +----------+
-| request  | --> | response |
-+----------+     +----------+
-```
+renders a diagram to `out.png` by default.
 
 ## Layout constraints
 
@@ -61,13 +55,16 @@ echo 'a -> b' | ./boxl
 ./boxl diagram.boxl
 ./boxl -e 'a["hello"] -> b'
 ./boxl -kitty -e 'a["hello"] -> b'
-./boxl -o diagram.txt diagram.boxl
+./boxl -o diagram.png diagram.boxl
 ```
 
+Without `-kitty`, boxl writes the diagram as a PNG to `out.png` in the current
+directory. Use `-o` to choose a different output file.
+
 `-kitty` draws geometric boxes, arrows, nesting, and labels into a PNG, then
-transmits it directly with the Kitty graphics protocol. It does not rasterize
-the ASCII output. The switch works with stdin, a source file, and `-e`; the
-terminal must support the protocol. Graphical output uses a transparent
+transmits it directly with the Kitty graphics protocol. The switch works with
+stdin, a source file, and `-e`; the terminal must support the protocol.
+Graphical output uses a transparent
 background with white boxes, arrows, and text for dark terminal backgrounds.
 
 When writing directly to a terminal, boxl obtains its physical cell dimensions
@@ -90,14 +87,10 @@ The main entry points are:
 ```go
 tokens, err := boxl.Tokenize(source)
 diagram, err := boxl.Parse(source)
-text, err := boxl.Render(source)
 png, err := boxl.RenderPNG(source)
-err = boxl.Transform(reader, writer)
 err = boxl.TransformKitty(reader, writer)
 err = boxl.TransformKittyAtCellSize(reader, writer, boxl.KittyCellSize{Width: 10, Height: 20})
 ```
-
-Use `NewRenderer` with `RenderOptions` when custom spacing is needed.
 
 ## Current language decisions
 
@@ -109,6 +102,5 @@ Use `NewRenderer` with `RenderOptions` when custom spacing is needed.
   text with nested content, multiple containers for one box, boundary-crossing
   connections or constraints, and contradictory layout constraints are
   reported as errors.
-- Text output gives all leaf boxes the same dimensions. Graphical output uses
-  compact 40x40 pixel boxes when they have no text; labeled leaves share the
-  same dimensions. Container boxes expand recursively around their contents.
+- Diagrams use compact 40x40 pixel boxes when they have no text; labeled leaves
+  share the same dimensions. Container boxes expand recursively around their contents.
