@@ -23,6 +23,7 @@ Use a directive to choose the layout of a chart or a containing box:
 | --- | --- |
 | `#dir:row` | Left to right, the default |
 | `#dir:col` or `#dir:column` | Top to bottom |
+| `#dir:diag` or `#dir:diagonal` | Down and right |
 | `#dir:grid:2x3` | Two rows and three columns, filled left to right, then top to bottom |
 
 `#layout` and `#direction` are aliases for `#dir`. Grid dimensions must be
@@ -52,6 +53,12 @@ lower[e f]
 
 `upper` is above `lower`. Inside `upper`, the four boxes form a grid; inside
 `lower`, `e` and `f` use the default row layout.
+
+Arrows leave a gap at both boxes. Forward connections use straight arrows when
+the path is clear. Return connections and forward connections blocked by other
+boxes curve around them. The renderer chooses a clear side and gives additional
+curves wider bends. Arrowheads follow the direction of the line or curve.
+Containing boxes expand to include their arrows.
 
 ## Command line
 

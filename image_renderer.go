@@ -13,7 +13,6 @@ import (
 	"golang.org/x/image/font/gofont/goregular"
 	"golang.org/x/image/font/opentype"
 	"golang.org/x/image/math/fixed"
-	"golang.org/x/image/vector"
 )
 
 const (
@@ -29,7 +28,7 @@ const (
 	imageLineWidth      = 2
 	imageArrowLength    = 11
 	imageArrowHalfWidth = 6
-	imageArrowBoxGap    = 2
+	imageArrowBoxGap    = 6
 	imageOuterMargin    = 6
 	kittyCellWidth      = 8
 	kittyCellHeight     = 16
@@ -62,6 +61,8 @@ type imageRenderer struct {
 	arrowLengthY      int
 	arrowHalfWidthX   int
 	arrowHalfWidthY   int
+	arrowGapX         int
+	arrowGapY         int
 	outerMarginX      int
 	outerMarginY      int
 }
@@ -185,6 +186,8 @@ func newImageRenderer(scaleX, scaleY float64) (*imageRenderer, error) {
 		arrowLengthY:      scaledPixel(imageArrowLength, scaleY),
 		arrowHalfWidthX:   scaledPixel(imageArrowHalfWidth, scaleX),
 		arrowHalfWidthY:   scaledPixel(imageArrowHalfWidth, scaleY),
+		arrowGapX:         scaledPixel(imageArrowBoxGap, scaleX),
+		arrowGapY:         scaledPixel(imageArrowBoxGap, scaleY),
 		outerMarginX:      scaledPixel(imageOuterMargin, scaleX),
 		outerMarginY:      scaledPixel(imageOuterMargin, scaleY),
 	}, nil
@@ -270,13 +273,23 @@ func (r *imageRenderer) renderScope(m *model, scope *declaredBox, metrics imageL
 		height = max(height, placement.y+boxImage.Bounds().Dy())
 	}
 
-	result := image.NewRGBA(image.Rect(0, 0, width, height))
-	for _, edge := range edges {
-		r.drawImageConnection(result, placements[edge.from], placements[edge.to])
+	routes, err := r.routeConnections(children, edges, placements)
+	if err != nil {
+		return nil, err
+	}
+	bounds := image.Rect(0, 0, width, height)
+	for _, route := range routes {
+		bounds = bounds.Union(r.connectionBounds(route))
+	}
+	offset := imagePoint{x: float64(-bounds.Min.X), y: float64(-bounds.Min.Y)}
+	result := image.NewRGBA(image.Rect(0, 0, bounds.Dx(), bounds.Dy()))
+	for _, route := range routes {
+		r.drawConnectionRoute(result, route, offset)
 	}
 	for _, box := range children {
 		placement := placements[box]
-		draw.Draw(result, placement.image.Bounds().Add(image.Pt(placement.x, placement.y)), placement.image, image.Point{}, draw.Over)
+		position := image.Pt(placement.x-bounds.Min.X, placement.y-bounds.Min.Y)
+		draw.Draw(result, placement.image.Bounds().Add(position), placement.image, image.Point{}, draw.Over)
 	}
 	return result, nil
 }
@@ -330,87 +343,12 @@ func (r *imageRenderer) drawImageBox(target *image.RGBA, fill color.Color) {
 	fillRectangle(target, image.Rect(bounds.Dx()-r.lineWidth, 0, bounds.Dx(), bounds.Dy()), imageStroke)
 }
 
-func (r *imageRenderer) drawImageConnection(target *image.RGBA, from, to imagePlacement) {
-	fromCenterX := from.x + from.image.Bounds().Dx()/2
-	fromCenterY := from.y + from.image.Bounds().Dy()/2
-	toCenterX := to.x + to.image.Bounds().Dx()/2
-	toCenterY := to.y + to.image.Bounds().Dy()/2
-	if abs(toCenterX-fromCenterX) >= abs(toCenterY-fromCenterY) {
-		direction := 1
-		fromX := from.x + from.image.Bounds().Dx() - 1
-		toX := to.x
-		if toCenterX < fromCenterX {
-			direction = -1
-			fromX = from.x
-			toX = to.x + to.image.Bounds().Dx() - 1
-		}
-		tipX := toX - direction*imageArrowBoxGap
-		baseX := tipX - direction*r.arrowLengthX
-		middleX := (fromX + baseX) / 2
-		r.drawHorizontalImageLine(target, fromX, middleX, fromCenterY)
-		r.drawVerticalImageLine(target, middleX, fromCenterY, toCenterY)
-		r.drawHorizontalImageLine(target, middleX, baseX, toCenterY)
-		r.drawImageArrowhead(target, tipX, toCenterY, direction, 0, r.arrowLengthX, r.arrowHalfWidthY)
-		return
-	}
-
-	direction := 1
-	fromY := from.y + from.image.Bounds().Dy() - 1
-	toY := to.y
-	if toCenterY < fromCenterY {
-		direction = -1
-		fromY = from.y
-		toY = to.y + to.image.Bounds().Dy() - 1
-	}
-	tipY := toY - direction*imageArrowBoxGap
-	baseY := tipY - direction*r.arrowLengthY
-	middleY := (fromY + baseY) / 2
-	r.drawVerticalImageLine(target, fromCenterX, fromY, middleY)
-	r.drawHorizontalImageLine(target, fromCenterX, toCenterX, middleY)
-	r.drawVerticalImageLine(target, toCenterX, middleY, baseY)
-	r.drawImageArrowhead(target, toCenterX, tipY, 0, direction, r.arrowLengthY, r.arrowHalfWidthX)
-}
-
-func (r *imageRenderer) drawHorizontalImageLine(target *image.RGBA, x1, x2, y int) {
-	if x1 > x2 {
-		x1, x2 = x2, x1
-	}
-	fillRectangle(target, image.Rect(x1, y-r.lineWidth/2, x2+1, y+(r.lineWidth+1)/2), imageStroke)
-}
-
-func (r *imageRenderer) drawVerticalImageLine(target *image.RGBA, x, y1, y2 int) {
-	if y1 > y2 {
-		y1, y2 = y2, y1
-	}
-	fillRectangle(target, image.Rect(x-r.lineWidth/2, y1, x+(r.lineWidth+1)/2, y2+1), imageStroke)
-}
-
-func (r *imageRenderer) drawImageArrowhead(target *image.RGBA, tipX, tipY, directionX, directionY, length, halfWidth int) {
-	baseX := tipX - directionX*length
-	baseY := tipY - directionY*length
-	perpendicularX := -directionY * halfWidth
-	perpendicularY := directionX * halfWidth
-	rasterizer := vector.NewRasterizer(target.Bounds().Dx(), target.Bounds().Dy())
-	rasterizer.MoveTo(float32(tipX)+0.5, float32(tipY)+0.5)
-	rasterizer.LineTo(float32(baseX+perpendicularX)+0.5, float32(baseY+perpendicularY)+0.5)
-	rasterizer.LineTo(float32(baseX-perpendicularX)+0.5, float32(baseY-perpendicularY)+0.5)
-	rasterizer.ClosePath()
-	rasterizer.Draw(target, target.Bounds(), image.NewUniform(imageStroke), image.Point{})
-}
-
 func fillImage(target *image.RGBA, fill color.Color) {
 	draw.Draw(target, target.Bounds(), image.NewUniform(fill), image.Point{}, draw.Src)
 }
 
 func fillRectangle(target *image.RGBA, rectangle image.Rectangle, fill color.Color) {
 	draw.Draw(target, rectangle.Intersect(target.Bounds()), image.NewUniform(fill), image.Point{}, draw.Src)
-}
-
-func abs(value int) int {
-	if value < 0 {
-		return -value
-	}
-	return value
 }
 
 func labelLines(text *string) []string {

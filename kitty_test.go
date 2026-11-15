@@ -39,10 +39,15 @@ func TestRenderPNG(t *testing.T) {
 	secondLeft := firstRight + imageHorizontalGap + 1
 	arrowTip := secondLeft - imageArrowBoxGap
 	arrowBase := arrowTip - imageArrowLength
-	for x := firstRight; x <= arrowBase; x++ {
+	for x := firstRight + imageArrowBoxGap + 1; x < arrowBase; x++ {
 		red, green, blue, alpha := image.At(x, centerY).RGBA()
 		if red < 0xe000 || green < 0xe000 || blue < 0xe000 || alpha < 0xe000 {
 			t.Fatalf("connection is broken at (%d, %d)", x, centerY)
+		}
+	}
+	for x := firstRight + 1; x < firstRight+imageArrowBoxGap; x++ {
+		if _, _, _, alpha := image.At(x, centerY).RGBA(); alpha != 0 {
+			t.Fatalf("arrow does not leave a source gap at (%d, %d)", x, centerY)
 		}
 	}
 	for x := arrowTip + 1; x < secondLeft; x++ {
@@ -129,10 +134,8 @@ func TestRenderPNGRoutesConnections(t *testing.T) {
 		tipX   int
 		tipY   int
 	}{
-		{"right", "#dir:row\na b\na -> b", imageOuterMargin + imageEmptyBoxSize + imageHorizontalGap - 1, imageOuterMargin + imageEmptyBoxSize/2, imageOuterMargin + imageEmptyBoxSize + imageHorizontalGap - 2, imageOuterMargin + imageEmptyBoxSize/2},
-		{"left", "#dir:row\nb a\na -> b", imageOuterMargin + imageEmptyBoxSize, imageOuterMargin + imageEmptyBoxSize/2, imageOuterMargin + imageEmptyBoxSize + 1, imageOuterMargin + imageEmptyBoxSize/2},
-		{"down", "#dir:col\na b\na -> b", imageOuterMargin + imageEmptyBoxSize/2, imageOuterMargin + imageEmptyBoxSize + imageVerticalGap - 1, imageOuterMargin + imageEmptyBoxSize/2, imageOuterMargin + imageEmptyBoxSize + imageVerticalGap - 2},
-		{"up", "#dir:col\nb a\na -> b", imageOuterMargin + imageEmptyBoxSize/2, imageOuterMargin + imageEmptyBoxSize, imageOuterMargin + imageEmptyBoxSize/2, imageOuterMargin + imageEmptyBoxSize + 1},
+		{"right", "#dir:row\na b\na -> b", 109, 26, 103, 26},
+		{"down", "#dir:col\na b\na -> b", 26, 73, 26, 67},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -220,6 +223,45 @@ func TestTransformKittyAtCellSizeMatchesPlacementPixels(t *testing.T) {
 	}
 	if got, want := rendered.Bounds().Dy(), rows*cellSize.Height; got != want {
 		t.Errorf("PNG height = %d, placement height = %d", got, want)
+	}
+}
+
+func TestTransformKittyDiagonalArrows(t *testing.T) {
+	const source = "outer[a['A'] -> b['B'] -> c['C'] #dir:diagonal c -> a]"
+	for _, size := range []KittyCellSize{{}, {Width: 10, Height: 24}} {
+		t.Run(strconv.Itoa(size.Width)+"x"+strconv.Itoa(size.Height), func(t *testing.T) {
+			var output bytes.Buffer
+			var err error
+			if size.valid() {
+				err = TransformKittyAtCellSize(strings.NewReader(source), &output, size)
+			} else {
+				err = TransformKitty(strings.NewReader(source), &output)
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			commands := parseKittyCommands(t, output.Bytes())
+			data := decodeKittyPayload(t, commands)
+			rendered, err := png.Decode(bytes.NewReader(data))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if size.valid() {
+				columns := kittyControlInteger(t, commands[0].control, "c")
+				rows := kittyControlInteger(t, commands[0].control, "r")
+				if rendered.Bounds().Dx() != columns*size.Width || rendered.Bounds().Dy() != rows*size.Height {
+					t.Fatalf("diagonal image bounds %v do not match Kitty placement %dx%d", rendered.Bounds(), columns*size.Width, rows*size.Height)
+				}
+			} else {
+				want, err := RenderPNG(source)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if !bytes.Equal(data, want) {
+					t.Fatal("Kitty diagonal output differs from PNG output")
+				}
+			}
+		})
 	}
 }
 

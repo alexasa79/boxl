@@ -148,8 +148,10 @@ func (p *Parser) parseLayoutDirective() (*LayoutDirective, error) {
 		layout.Direction = LayoutColumn
 	case "grid":
 		layout.Direction = LayoutGrid
+	case "diag", "diagonal":
+		layout.Direction = LayoutDiagonal
 	default:
-		return nil, p.errorf(token, "unknown layout direction %q; expected row, col, column, or grid", parts[1])
+		return nil, p.errorf(token, "unknown layout direction %q; expected row, col, column, grid, diag, or diagonal", parts[1])
 	}
 	if layout.Direction == LayoutGrid {
 		if len(parts) != 3 {

@@ -15,6 +15,8 @@ func TestLayoutDirectivePositions(t *testing.T) {
 		{"explicit row", "#dir:row\na b c", []layoutPosition{{column: 0}, {column: 1}, {column: 2}}},
 		{"col alias", "#dir:col\na b c", []layoutPosition{{row: 0}, {row: 1}, {row: 2}}},
 		{"column", "#dir:column\na\nb c", []layoutPosition{{row: 0}, {row: 1}, {row: 2}}},
+		{"diag alias", "#dir:diag\na b c", []layoutPosition{{}, {column: 1, row: 1}, {column: 2, row: 2}}},
+		{"diagonal", "#dir:diagonal\na b c", []layoutPosition{{}, {column: 1, row: 1}, {column: 2, row: 2}}},
 		{"wide grid", "#dir:grid:2x3\na b c d e", []layoutPosition{{}, {column: 1}, {column: 2}, {row: 1}, {column: 1, row: 1}}},
 		{"tall grid", "#dir:grid:3x2\na b c d e", []layoutPosition{{}, {column: 1}, {row: 1}, {column: 1, row: 1}, {row: 2}}},
 		{"connections do not branch layout", "a -> b\na -> c", []layoutPosition{{column: 0}, {column: 1}, {column: 2}}},
@@ -96,6 +98,7 @@ func TestLayoutDirectiveValidation(t *testing.T) {
 	}
 	for _, source := range []string{
 		"outer[#dir:col a]\nouter[#direction:column b]",
+		"outer[#dir:diag a]\nouter[#direction:diagonal b]",
 		"#dir:grid:9223372036854775807x9223372036854775807\na b",
 	} {
 		if _, err := RenderPNG(source); err != nil {

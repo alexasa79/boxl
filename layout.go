@@ -25,6 +25,9 @@ func layoutBoxes(children []*declaredBox, layout *LayoutDirective, scope *declar
 			position.column = i
 		case LayoutColumn:
 			position.row = i
+		case LayoutDiagonal:
+			position.column = i
+			position.row = i
 		case LayoutGrid:
 			position.column = i % layout.Columns
 			position.row = i / layout.Columns

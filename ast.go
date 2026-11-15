@@ -17,9 +17,10 @@ type Diagram struct {
 type LayoutDirection string
 
 const (
-	LayoutRow    LayoutDirection = "row"
-	LayoutColumn LayoutDirection = "column"
-	LayoutGrid   LayoutDirection = "grid"
+	LayoutRow      LayoutDirection = "row"
+	LayoutColumn   LayoutDirection = "column"
+	LayoutGrid     LayoutDirection = "grid"
+	LayoutDiagonal LayoutDirection = "diagonal"
 )
 
 // LayoutDirective configures one diagram. Grid dimensions are rows by columns.

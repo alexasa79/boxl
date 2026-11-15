@@ -75,6 +75,7 @@ func TestParseLayoutDirectives(t *testing.T) {
 		}{
 			{"row", LayoutRow}, {"col", LayoutColumn},
 			{"column", LayoutColumn}, {"grid:2x3", LayoutGrid},
+			{"diag", LayoutDiagonal}, {"diagonal", LayoutDiagonal},
 		} {
 			t.Run(name+":"+mode.value, func(t *testing.T) {
 				diagram, err := Parse("#" + name + ":" + mode.value + "\na b")
@@ -114,6 +115,7 @@ func TestParseRejectsInvalidLayoutDirectives(t *testing.T) {
 		{"#dir", "expected layout direction"},
 		{"#dir:", "unknown layout direction"},
 		{"#dir:circle", "unknown layout direction"},
+		{"#dir:diag:2x3", "does not accept dimensions"},
 		{"#dir:row:2x3", "does not accept dimensions"},
 		{"#dir:col:2", "does not accept dimensions"},
 		{"#dir:grid", "grid requires dimensions"},
