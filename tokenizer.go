@@ -17,8 +17,7 @@ const (
 	TokenArrow
 	TokenLeftBracket
 	TokenRightBracket
-	TokenAt
-	TokenComma
+	TokenDirective
 	TokenNewline
 	TokenEOF
 )
@@ -35,10 +34,8 @@ func (t TokenType) String() string {
 		return "["
 	case TokenRightBracket:
 		return "]"
-	case TokenAt:
-		return "@"
-	case TokenComma:
-		return ","
+	case TokenDirective:
+		return "layout directive"
 	case TokenNewline:
 		return "newline"
 	case TokenEOF:
@@ -49,7 +46,8 @@ func (t TokenType) String() string {
 }
 
 // Token is one item produced by Tokenizer. Lexeme contains the source spelling;
-// Value contains decoded quoted text or the identifier name.
+// Value contains decoded quoted text, an identifier name, or directive text
+// without its leading #.
 type Token struct {
 	Type     TokenType
 	Lexeme   string
@@ -57,7 +55,7 @@ type Token struct {
 	Position Position
 }
 
-// Tokenizer converts box language source into tokens. Newlines are significant.
+// Tokenizer converts box language source into tokens. Newlines delimit statements.
 type Tokenizer struct {
 	input  string
 	offset int
@@ -117,6 +115,8 @@ func (t *Tokenizer) Next() (Token, error) {
 	}
 
 	switch t.input[t.offset] {
+	case '#':
+		return t.scanDirective(), nil
 	case '[':
 		t.offset++
 		t.column++
@@ -125,14 +125,6 @@ func (t *Tokenizer) Next() (Token, error) {
 		t.offset++
 		t.column++
 		return Token{Type: TokenRightBracket, Lexeme: "]", Position: start}, nil
-	case '@':
-		t.offset++
-		t.column++
-		return Token{Type: TokenAt, Lexeme: "@", Position: start}, nil
-	case ',':
-		t.offset++
-		t.column++
-		return Token{Type: TokenComma, Lexeme: ",", Position: start}, nil
 	case '-':
 		if t.offset+1 < len(t.input) && t.input[t.offset+1] == '>' {
 			t.offset += 2
@@ -148,6 +140,20 @@ func (t *Tokenizer) Next() (Token, error) {
 		return t.scanIdentifier(), nil
 	}
 	return Token{}, lexicalError(start, "unexpected character %q", r)
+}
+
+func (t *Tokenizer) scanDirective() Token {
+	start := t.position()
+	startOffset := t.offset
+	for t.offset < len(t.input) {
+		r, size := utf8.DecodeRuneInString(t.input[t.offset:])
+		if unicode.IsSpace(r) || r == '[' || r == ']' {
+			break
+		}
+		t.advanceRune(r, size)
+	}
+	lexeme := t.input[startOffset:t.offset]
+	return Token{Type: TokenDirective, Lexeme: lexeme, Value: lexeme[1:], Position: start}
 }
 
 func (t *Tokenizer) scanIdentifier() Token {

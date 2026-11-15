@@ -1,6 +1,10 @@
 package boxl
 
-import "fmt"
+import (
+	"fmt"
+	"strconv"
+	"strings"
+)
 
 // Parser turns tokenizer output into a Diagram.
 type Parser struct {
@@ -44,11 +48,6 @@ func (p *Parser) parseDiagram(end TokenType) (*Diagram, error) {
 	if _, err := p.consumeNewlines(); err != nil {
 		return nil, err
 	}
-	var layoutRows []int
-	flushLayout := func() {
-		addVerticalLayoutConstraints(diagram, layoutRows)
-		layoutRows = nil
-	}
 	for p.current.Type != end {
 		if p.current.Type == TokenEOF {
 			if end == TokenRightBracket {
@@ -56,37 +55,41 @@ func (p *Parser) parseDiagram(end TokenType) (*Diagram, error) {
 			}
 			break
 		}
+		if p.current.Type == TokenDirective {
+			if diagram.Layout != nil {
+				return nil, p.errorf(p.current, "only one layout directive is allowed per diagram")
+			}
+			layout, err := p.parseLayoutDirective()
+			if err != nil {
+				return nil, err
+			}
+			diagram.Layout = layout
+			if _, err := p.consumeNewlines(); err != nil {
+				return nil, err
+			}
+			continue
+		}
 		statement, err := p.parseStatement()
 		if err != nil {
 			return nil, err
 		}
-		if statement.Connected {
-			flushLayout()
-		} else {
-			addHorizontalLayoutConstraints(&statement)
-		}
 		diagram.Statements = append(diagram.Statements, statement)
-		if !statement.Connected {
-			layoutRows = append(layoutRows, len(diagram.Statements)-1)
-		}
 		if p.current.Type == end {
 			break
 		}
 		if p.current.Type == TokenEOF && end == TokenRightBracket {
 			return nil, p.errorf(p.current, "expected ] before end of input")
 		}
+		if p.current.Type == TokenDirective {
+			continue
+		}
 		if p.current.Type != TokenNewline {
 			return nil, p.errorf(p.current, "expected newline or %s, got %s", end, p.current.Type)
 		}
-		newlines, err := p.consumeNewlines()
-		if err != nil {
+		if _, err := p.consumeNewlines(); err != nil {
 			return nil, err
 		}
-		if newlines > 1 {
-			flushLayout()
-		}
 	}
-	flushLayout()
 	return diagram, nil
 }
 
@@ -126,37 +129,58 @@ func (p *Parser) parseStatement() (Statement, error) {
 	return statement, nil
 }
 
-func addHorizontalLayoutConstraints(statement *Statement) {
-	for i := 1; i < len(statement.Boxes); i++ {
-		previous := &statement.Boxes[i-1]
-		if previous.Identifier == statement.Boxes[i].Identifier {
-			continue
-		}
-		previous.Constraints = append(previous.Constraints, LayoutConstraint{
-			Relation: ConstraintThen,
-			Target:   statement.Boxes[i].Identifier,
-			Position: previous.Position,
-		})
+func (p *Parser) parseLayoutDirective() (*LayoutDirective, error) {
+	token := p.current
+	parts := strings.Split(token.Value, ":")
+	switch parts[0] {
+	case "dir", "direction", "layout":
+	default:
+		return nil, p.errorf(token, "unknown directive %q", parts[0])
 	}
+	if len(parts) < 2 {
+		return nil, p.errorf(token, "expected layout direction after #%s:", parts[0])
+	}
+	layout := &LayoutDirective{Position: token.Position}
+	switch parts[1] {
+	case "row":
+		layout.Direction = LayoutRow
+	case "col", "column":
+		layout.Direction = LayoutColumn
+	case "grid":
+		layout.Direction = LayoutGrid
+	default:
+		return nil, p.errorf(token, "unknown layout direction %q; expected row, col, column, or grid", parts[1])
+	}
+	if layout.Direction == LayoutGrid {
+		if len(parts) != 3 {
+			return nil, p.errorf(token, "grid requires dimensions as rows x columns, for example #dir:grid:3x3")
+		}
+		rows, columns, found := strings.Cut(parts[2], "x")
+		layout.Rows = positiveDimension(rows)
+		layout.Columns = positiveDimension(columns)
+		if !found || layout.Rows == 0 || layout.Columns == 0 {
+			return nil, p.errorf(token, "grid dimensions must be positive integers in rows x columns form")
+		}
+	} else if len(parts) != 2 {
+		return nil, p.errorf(token, "%s layout does not accept dimensions", parts[1])
+	}
+	if err := p.advance(); err != nil {
+		return nil, err
+	}
+	return layout, nil
 }
 
-func addVerticalLayoutConstraints(diagram *Diagram, rows []int) {
-	for i := 1; i < len(rows); i++ {
-		above := &diagram.Statements[rows[i-1]]
-		below := &diagram.Statements[rows[i]]
-		columns := min(len(above.Boxes), len(below.Boxes))
-		for column := 0; column < columns; column++ {
-			box := &above.Boxes[column]
-			if box.Identifier == below.Boxes[column].Identifier {
-				continue
-			}
-			box.Constraints = append(box.Constraints, LayoutConstraint{
-				Relation: ConstraintAbove,
-				Target:   below.Boxes[column].Identifier,
-				Position: box.Position,
-			})
+func positiveDimension(value string) int {
+	for _, digit := range value {
+		if digit < '0' || digit > '9' {
+			return 0
 		}
 	}
+	dimension, err := strconv.Atoi(value)
+	if err != nil || dimension <= 0 {
+		return 0
+	}
+	return dimension
 }
 
 func (p *Parser) parseBox() (BoxExpression, error) {
@@ -192,59 +216,7 @@ func (p *Parser) parseBox() (BoxExpression, error) {
 		}
 	}
 
-	if p.current.Type == TokenAt {
-		constraints, err := p.parseConstraints()
-		if err != nil {
-			return BoxExpression{}, err
-		}
-		box.Constraints = constraints
-	}
 	return box, nil
-}
-
-func (p *Parser) parseConstraints() ([]LayoutConstraint, error) {
-	if err := p.advance(); err != nil {
-		return nil, err
-	}
-	var constraints []LayoutConstraint
-	for {
-		if p.current.Type != TokenIdentifier {
-			return nil, p.errorf(p.current, "expected layout constraint after @ or comma, got %s", p.current.Type)
-		}
-		relationToken := p.current
-		relation, ok := parseConstraintRelation(relationToken.Value)
-		if !ok {
-			return nil, p.errorf(relationToken, "unknown layout constraint %q", relationToken.Value)
-		}
-		if err := p.advance(); err != nil {
-			return nil, err
-		}
-		if p.current.Type != TokenIdentifier {
-			return nil, p.errorf(p.current, "expected identifier after %s, got %s", relation, p.current.Type)
-		}
-		constraints = append(constraints, LayoutConstraint{
-			Relation: relation, Target: p.current.Value, Position: relationToken.Position,
-		})
-		if err := p.advance(); err != nil {
-			return nil, err
-		}
-		if p.current.Type != TokenComma {
-			return constraints, nil
-		}
-		if err := p.advance(); err != nil {
-			return nil, err
-		}
-	}
-}
-
-func parseConstraintRelation(value string) (ConstraintRelation, bool) {
-	relation := ConstraintRelation(value)
-	switch relation {
-	case ConstraintThen, ConstraintLeftOf, ConstraintRightOf, ConstraintAbove, ConstraintBelow:
-		return relation, true
-	default:
-		return "", false
-	}
 }
 
 func (p *Parser) consumeNewlines() (int, error) {

@@ -2,7 +2,7 @@
 
 `boxl` is a small Go library and command-line renderer for the box language.
 It tokenizes and parses source into an AST, collects global box declarations in
-a first rendering pass, then performs constraint layout and rendering in a
+a first rendering pass, then performs layout and rendering in a
 second pass.
 
 ```text
@@ -11,41 +11,47 @@ a["request"] -> b["response"]
 
 renders a diagram to `out.png` by default.
 
-## Layout constraints
+## Layout
 
-`->` only declares connections. Whitespace describes relative placement:
+Boxes are arranged from left to right by default, equivalent to `#dir:row`.
+Boxes are ordered by their first appearance in the source, and repeated
+references occupy one cell. Use `->` to connect boxes.
+
+Use a directive to choose the layout of a chart or a containing box:
+
+| Directive | Arrangement |
+| --- | --- |
+| `#dir:row` | Left to right, the default |
+| `#dir:col` or `#dir:column` | Top to bottom |
+| `#dir:grid:2x3` | Two rows and three columns, filled left to right, then top to bottom |
+
+`#layout` and `#direction` are aliases for `#dir`. Grid dimensions must be
+positive integers. Unused cells are allowed; exceeding the grid's capacity is
+an error. Rows and columns grow to fit their contents, with boxes centered
+within their cells.
 
 ```text
-a["input"] -> b["process"]
-
-a b
-```
-
-Boxes on one line are arranged from left to right. Consecutive layout lines
-form rows, with boxes in matching columns arranged from top to bottom. Thus
-`a b` is shorthand for `a@then b`, while `a` followed by `b` on the next line
-is shorthand for `a@above b`. A blank line or the end of the containing diagram
-ends a whitespace layout description. Arrow statements are not layout rows and
-separate adjacent layout descriptions.
-
-```text
+#dir:grid:2x2
 a b
 c d
 ```
 
-The example above forms a two-row, two-column layout.
+This arranges `a` and `b` in the first row, with `c` and `d` in the second.
 
-The explicit `@` form remains available. Constraints are read relative to the
-box before `@`:
+Each diagram can have one directive, anywhere among its statements. A directive
+applies to that entire diagram, without being inherited by nested boxes:
 
-- `then d` and `left-of d` place `d` to its right.
-- `right-of d` places it to the right of `d`.
-- `above d` and `below d` place it vertically relative to `d`.
+```text
+#dir:col
+upper[
+    #dir:grid:2x2
+    a b c d
+]
+lower[e f]
+```
 
-Horizontal constraints align box centers vertically; vertical constraints
-align them horizontally. Spacing and all unconstrained placement remain
-automatic. Multiple declarations of a box accumulate constraints, and
-constraints may only refer to boxes in the same container.
+`upper` is above `lower`. Inside `upper`, the four boxes form a grid; inside
+`lower`, `e` and `f` use the default row layout.
 
 ## Command line
 
@@ -99,8 +105,8 @@ err = boxl.TransformKittyAtCellSize(reader, writer, boxl.KittyCellSize{Width: 10
 - Single- and double-quoted text may span physical lines. Line breaks and
   indentation are preserved, and Go-style escapes remain supported.
 - Repeating the same text declaration is allowed. Conflicting text, combining
-  text with nested content, multiple containers for one box, boundary-crossing
-  connections or constraints, and contradictory layout constraints are
-  reported as errors.
+  text with nested content, multiple containers for one box, connections that
+  cross container boundaries, and conflicting layout directives are reported
+  as errors.
 - Diagrams use compact 40x40 pixel boxes when they have no text; labeled leaves
   share the same dimensions. Container boxes expand recursively around their contents.

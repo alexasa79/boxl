@@ -73,21 +73,24 @@ func TestTokenizeMultilineQuotedText(t *testing.T) {
 	}
 }
 
-func TestTokenizeLayoutConstraints(t *testing.T) {
-	tokens, err := Tokenize("a@then b,below c")
+func TestTokenizeLayoutDirective(t *testing.T) {
+	tokens, err := Tokenize("outer[#dir:grid:2x3\n a]")
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := []TokenType{
-		TokenIdentifier, TokenAt, TokenIdentifier, TokenIdentifier, TokenComma,
-		TokenIdentifier, TokenIdentifier, TokenEOF,
+	directive := tokens[2]
+	if directive.Type != TokenDirective || directive.Lexeme != "#dir:grid:2x3" || directive.Value != "dir:grid:2x3" {
+		t.Fatalf("directive token = %+v", directive)
 	}
-	if len(tokens) != len(want) {
-		t.Fatalf("got %d tokens, want %d", len(tokens), len(want))
+	if directive.Position.Line != 1 || directive.Position.Column != 7 || tokens[4].Position.Line != 2 {
+		t.Fatalf("token positions = %+v", tokens)
 	}
-	for i, tokenType := range want {
-		if tokens[i].Type != tokenType {
-			t.Errorf("token %d = %s, want %s", i, tokens[i].Type, tokenType)
-		}
+	// A directive next to a closing bracket must leave the bracket unconsumed.
+	tokens, err = Tokenize("empty[#dir:col]")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if tokens[3].Type != TokenRightBracket {
+		t.Fatalf("closing token = %+v", tokens[3])
 	}
 }

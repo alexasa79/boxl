@@ -2,6 +2,7 @@ package boxl
 
 import (
 	"bytes"
+	"image/png"
 	"strings"
 	"testing"
 )
@@ -44,5 +45,49 @@ func TestRenderPNGRejectsAmbiguousDeclarations(t *testing.T) {
 func TestRenderPNGAllowsConnectionCycles(t *testing.T) {
 	if _, err := RenderPNG("a -> b\nb -> a"); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestRenderPNGLayoutDimensions(t *testing.T) {
+	for _, test := range []struct {
+		name   string
+		source string
+		width  int
+		height int
+	}{
+		{"default row", "a\nb\n\nc d e", 468, 52},
+		{"column", "#direction:column\na b c d e", 52, 324},
+		{"grid", "#layout:grid:2x3\na b c d e", 260, 120},
+		{"nested layouts", "#dir:col\nouter[#dir:grid:2x2 a b c d]\nother[x y]", 204, 284},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			data, err := RenderPNG(test.source)
+			if err != nil {
+				t.Fatal(err)
+			}
+			rendered, err := png.Decode(bytes.NewReader(data))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if rendered.Bounds().Dx() != test.width || rendered.Bounds().Dy() != test.height {
+				t.Fatalf("image bounds = %v, want %dx%d", rendered.Bounds(), test.width, test.height)
+			}
+		})
+	}
+}
+
+func TestRenderPNGLayoutIgnoresLineBreaks(t *testing.T) {
+	for _, directive := range []string{"", "#dir:row\n", "#dir:col\n", "#dir:grid:2x2\n"} {
+		want, err := RenderPNG(directive + "a b c d")
+		if err != nil {
+			t.Fatal(err)
+		}
+		got, err := RenderPNG(directive + "a\n b\n\n c d")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !bytes.Equal(got, want) {
+			t.Errorf("line breaks change layout for %q", directive)
+		}
 	}
 }

@@ -10,40 +10,39 @@ type Position struct {
 // Diagram is a sequence of newline-separated statements.
 type Diagram struct {
 	Statements []Statement
+	Layout     *LayoutDirective
 }
 
-// Statement declares a connection chain or one row of a whitespace layout.
+// LayoutDirection selects how a diagram arranges its immediate children.
+type LayoutDirection string
+
+const (
+	LayoutRow    LayoutDirection = "row"
+	LayoutColumn LayoutDirection = "column"
+	LayoutGrid   LayoutDirection = "grid"
+)
+
+// LayoutDirective configures one diagram. Grid dimensions are rows by columns.
+// A nil directive means row layout.
+type LayoutDirective struct {
+	Direction LayoutDirection
+	Rows      int
+	Columns   int
+	Position  Position
+}
+
+// Statement declares boxes or a connection chain.
 type Statement struct {
 	Boxes     []BoxExpression
 	Connected bool
 	Position  Position
 }
 
-// ConstraintRelation identifies a relative placement constraint.
-type ConstraintRelation string
-
-const (
-	ConstraintThen    ConstraintRelation = "then"
-	ConstraintLeftOf  ConstraintRelation = "left-of"
-	ConstraintRightOf ConstraintRelation = "right-of"
-	ConstraintAbove   ConstraintRelation = "above"
-	ConstraintBelow   ConstraintRelation = "below"
-)
-
-// LayoutConstraint places the containing box relative to Target. Then is an
-// alias for placing Target to the right of the containing box.
-type LayoutConstraint struct {
-	Relation ConstraintRelation
-	Target   string
-	Position Position
-}
-
 // BoxExpression is one occurrence of a box identifier. Text and Diagram are
 // mutually exclusive in the grammar.
 type BoxExpression struct {
-	Identifier  string
-	Text        *string
-	Diagram     *Diagram
-	Constraints []LayoutConstraint
-	Position    Position
+	Identifier string
+	Text       *string
+	Diagram    *Diagram
+	Position   Position
 }

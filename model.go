@@ -5,10 +5,10 @@ import "fmt"
 // model is built during rendering pass one. A single declaredBox is shared by
 // every occurrence of the same identifier.
 type model struct {
-	boxes       map[string]*declaredBox
-	order       []*declaredBox
-	edges       []connection
-	constraints []declaredConstraint
+	boxes   map[string]*declaredBox
+	order   []*declaredBox
+	edges   []connection
+	layouts map[*declaredBox]*LayoutDirective
 }
 
 type declaredBox struct {
@@ -29,19 +29,14 @@ type connection struct {
 	position Position
 }
 
-type declaredConstraint struct {
-	box      *declaredBox
-	target   *declaredBox
-	relation ConstraintRelation
-	scope    *declaredBox
-	position Position
-}
-
 func declarationPass(diagram *Diagram) (*model, error) {
 	if diagram == nil {
 		return nil, fmt.Errorf("diagram is nil")
 	}
-	m := &model{boxes: make(map[string]*declaredBox)}
+	m := &model{
+		boxes:   make(map[string]*declaredBox),
+		layouts: make(map[*declaredBox]*LayoutDirective),
+	}
 	if err := m.declareDiagram(diagram, nil); err != nil {
 		return nil, err
 	}
@@ -51,13 +46,17 @@ func declarationPass(diagram *Diagram) (*model, error) {
 	if err := m.validateConnections(); err != nil {
 		return nil, err
 	}
-	if err := m.validateConstraints(); err != nil {
-		return nil, err
-	}
 	return m, nil
 }
 
 func (m *model) declareDiagram(diagram *Diagram, scope *declaredBox) error {
+	if layout := diagram.Layout; layout != nil {
+		if previous := m.layouts[scope]; previous != nil &&
+			(previous.Direction != layout.Direction || previous.Rows != layout.Rows || previous.Columns != layout.Columns) {
+			return modelError(layout.Position, "conflicting layout directives in %s", scopeLabel(scope))
+		}
+		m.layouts[scope] = layout
+	}
 	for i := range diagram.Statements {
 		statement := &diagram.Statements[i]
 		boxes := make([]*declaredBox, len(statement.Boxes))
@@ -109,18 +108,6 @@ func (m *model) declareBox(expression *BoxExpression, scope *declaredBox) (*decl
 		}
 	}
 
-	for _, constraint := range expression.Constraints {
-		target, err := m.declareReference(constraint.Target, constraint.Position, scope)
-		if err != nil {
-			return nil, err
-		}
-		if target == box {
-			return nil, modelError(constraint.Position, "box %q cannot be constrained relative to itself", box.name)
-		}
-		m.constraints = append(m.constraints, declaredConstraint{
-			box: box, target: target, relation: constraint.Relation, scope: scope, position: constraint.Position,
-		})
-	}
 	return box, nil
 }
 
@@ -186,17 +173,6 @@ func (m *model) validateConnections() error {
 	return nil
 }
 
-func (m *model) validateConstraints() error {
-	for _, constraint := range m.constraints {
-		if constraint.box.parent != constraint.scope || constraint.target.parent != constraint.scope {
-			return modelError(constraint.position,
-				"layout constraint between %q and %q crosses the boundary of %s",
-				constraint.box.name, constraint.target.name, scopeLabel(constraint.scope))
-		}
-	}
-	return nil
-}
-
 func (m *model) children(scope *declaredBox) []*declaredBox {
 	children := make([]*declaredBox, 0)
 	for _, box := range m.order {
@@ -215,16 +191,6 @@ func (m *model) connections(scope *declaredBox) []connection {
 		}
 	}
 	return edges
-}
-
-func (m *model) layoutConstraints(scope *declaredBox) []declaredConstraint {
-	constraints := make([]declaredConstraint, 0)
-	for _, constraint := range m.constraints {
-		if constraint.scope == scope {
-			constraints = append(constraints, constraint)
-		}
-	}
-	return constraints
 }
 
 func scopeLabel(scope *declaredBox) string {

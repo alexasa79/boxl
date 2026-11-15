@@ -229,7 +229,7 @@ func (r *imageRenderer) renderScope(m *model, scope *declaredBox, metrics imageL
 	}
 
 	edges := m.connections(scope)
-	grid, err := layoutBoxes(children, m.layoutConstraints(scope), edges, scope)
+	grid, err := layoutBoxes(children, m.layouts[scope], scope)
 	if err != nil {
 		return nil, err
 	}

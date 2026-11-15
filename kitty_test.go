@@ -104,8 +104,8 @@ func TestRenderPNGExpandsForMultilineText(t *testing.T) {
 	}
 }
 
-func TestRenderPNGUsesWhitespaceLayout(t *testing.T) {
-	data, err := RenderPNG("a b\nc d")
+func TestRenderPNGUsesGridLayout(t *testing.T) {
+	data, err := RenderPNG("#dir:grid:2x2\na b\nc d")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -120,23 +120,23 @@ func TestRenderPNGUsesWhitespaceLayout(t *testing.T) {
 	}
 }
 
-func TestRenderPNGRoutesConstrainedConnections(t *testing.T) {
+func TestRenderPNGRoutesConnections(t *testing.T) {
 	tests := []struct {
-		name       string
-		constraint string
-		gapX       int
-		gapY       int
-		tipX       int
-		tipY       int
+		name   string
+		source string
+		gapX   int
+		gapY   int
+		tipX   int
+		tipY   int
 	}{
-		{"right", "left-of", imageOuterMargin + imageEmptyBoxSize + imageHorizontalGap - 1, imageOuterMargin + imageEmptyBoxSize/2, imageOuterMargin + imageEmptyBoxSize + imageHorizontalGap - 2, imageOuterMargin + imageEmptyBoxSize/2},
-		{"left", "right-of", imageOuterMargin + imageEmptyBoxSize, imageOuterMargin + imageEmptyBoxSize/2, imageOuterMargin + imageEmptyBoxSize + 1, imageOuterMargin + imageEmptyBoxSize/2},
-		{"down", "above", imageOuterMargin + imageEmptyBoxSize/2, imageOuterMargin + imageEmptyBoxSize + imageVerticalGap - 1, imageOuterMargin + imageEmptyBoxSize/2, imageOuterMargin + imageEmptyBoxSize + imageVerticalGap - 2},
-		{"up", "below", imageOuterMargin + imageEmptyBoxSize/2, imageOuterMargin + imageEmptyBoxSize, imageOuterMargin + imageEmptyBoxSize/2, imageOuterMargin + imageEmptyBoxSize + 1},
+		{"right", "#dir:row\na b\na -> b", imageOuterMargin + imageEmptyBoxSize + imageHorizontalGap - 1, imageOuterMargin + imageEmptyBoxSize/2, imageOuterMargin + imageEmptyBoxSize + imageHorizontalGap - 2, imageOuterMargin + imageEmptyBoxSize/2},
+		{"left", "#dir:row\nb a\na -> b", imageOuterMargin + imageEmptyBoxSize, imageOuterMargin + imageEmptyBoxSize/2, imageOuterMargin + imageEmptyBoxSize + 1, imageOuterMargin + imageEmptyBoxSize/2},
+		{"down", "#dir:col\na b\na -> b", imageOuterMargin + imageEmptyBoxSize/2, imageOuterMargin + imageEmptyBoxSize + imageVerticalGap - 1, imageOuterMargin + imageEmptyBoxSize/2, imageOuterMargin + imageEmptyBoxSize + imageVerticalGap - 2},
+		{"up", "#dir:col\nb a\na -> b", imageOuterMargin + imageEmptyBoxSize/2, imageOuterMargin + imageEmptyBoxSize, imageOuterMargin + imageEmptyBoxSize/2, imageOuterMargin + imageEmptyBoxSize + 1},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			data, err := RenderPNG("a -> b\na@" + test.constraint + " b")
+			data, err := RenderPNG(test.source)
 			if err != nil {
 				t.Fatal(err)
 			}

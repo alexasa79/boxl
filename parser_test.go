@@ -67,74 +67,80 @@ func TestParseMultilineQuotedText(t *testing.T) {
 	}
 }
 
-func TestParseWhitespaceLayoutConstraints(t *testing.T) {
-	diagram, err := Parse("a b\nc d")
+func TestParseLayoutDirectives(t *testing.T) {
+	for _, name := range []string{"dir", "layout", "direction"} {
+		for _, mode := range []struct {
+			value string
+			want  LayoutDirection
+		}{
+			{"row", LayoutRow}, {"col", LayoutColumn},
+			{"column", LayoutColumn}, {"grid:2x3", LayoutGrid},
+		} {
+			t.Run(name+":"+mode.value, func(t *testing.T) {
+				diagram, err := Parse("#" + name + ":" + mode.value + "\na b")
+				if err != nil {
+					t.Fatal(err)
+				}
+				layout := diagram.Layout
+				if layout == nil || layout.Direction != mode.want {
+					t.Fatalf("layout = %+v, want %s", layout, mode.want)
+				}
+				if mode.want == LayoutGrid && (layout.Rows != 2 || layout.Columns != 3) {
+					t.Fatalf("grid = %+v, want 2 rows and 3 columns", layout)
+				}
+			})
+		}
+	}
+}
+
+func TestParseNestedLayoutDirectives(t *testing.T) {
+	diagram, err := Parse("#dir:col\nouter[#layout:grid:2x3 a b c]\nother[x y]")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(diagram.Statements) != 2 || diagram.Statements[0].Connected || diagram.Statements[1].Connected {
-		t.Fatalf("statements = %+v", diagram.Statements)
+	outer := diagram.Statements[0].Boxes[0].Diagram
+	other := diagram.Statements[1].Boxes[0].Diagram
+	if diagram.Layout.Direction != LayoutColumn || outer.Layout.Direction != LayoutGrid || other.Layout != nil {
+		t.Fatalf("layouts: top=%+v, outer=%+v, other=%+v", diagram.Layout, outer.Layout, other.Layout)
 	}
-	want := [][]LayoutConstraint{
-		{
-			{Relation: ConstraintThen, Target: "b", Position: Position{Line: 1, Column: 1}},
-			{Relation: ConstraintAbove, Target: "c", Position: Position{Line: 1, Column: 1}},
-		},
-		{{Relation: ConstraintAbove, Target: "d", Position: Position{Offset: 2, Line: 1, Column: 3}}},
-		{{Relation: ConstraintThen, Target: "d", Position: Position{Offset: 4, Line: 2, Column: 1}}},
+}
+
+func TestParseRejectsInvalidLayoutDirectives(t *testing.T) {
+	tests := []struct {
+		source string
+		want   string
+	}{
+		{"#unknown:row", "unknown directive"},
+		{"#dir", "expected layout direction"},
+		{"#dir:", "unknown layout direction"},
+		{"#dir:circle", "unknown layout direction"},
+		{"#dir:row:2x3", "does not accept dimensions"},
+		{"#dir:col:2", "does not accept dimensions"},
+		{"#dir:grid", "grid requires dimensions"},
+		{"#dir:grid:2x3:4", "grid requires dimensions"},
+		{"#dir:grid:0x3", "positive integers"},
+		{"#dir:grid:2x0", "positive integers"},
+		{"#dir:grid:-2x3", "positive integers"},
+		{"#dir:grid:+2x3", "positive integers"},
+		{"#dir:grid:2", "positive integers"},
+		{"#dir:grid:2x", "positive integers"},
+		{"#dir:grid:2x3x4", "positive integers"},
+		{"#dir:grid:2xthree", "positive integers"},
+		{"#dir:grid:999999999999999999999999x2", "positive integers"},
+		{"#dir:row\n#layout:col", "only one layout directive"},
+		{"outer[#dir:row #dir:row]", "only one layout directive"},
 	}
-	got := []BoxExpression{
-		diagram.Statements[0].Boxes[0],
-		diagram.Statements[0].Boxes[1],
-		diagram.Statements[1].Boxes[0],
-	}
-	for i := range want {
-		if len(got[i].Constraints) != len(want[i]) {
-			t.Fatalf("box %s constraints = %+v", got[i].Identifier, got[i].Constraints)
-		}
-		for j := range want[i] {
-			if got[i].Constraints[j] != want[i][j] {
-				t.Errorf("box %s constraint %d = %+v, want %+v", got[i].Identifier, j, got[i].Constraints[j], want[i][j])
+	for _, test := range tests {
+		t.Run(test.source, func(t *testing.T) {
+			_, err := Parse(test.source)
+			if err == nil || !strings.Contains(err.Error(), test.want) {
+				t.Fatalf("error = %v, want %q", err, test.want)
 			}
-		}
+		})
 	}
-}
-
-func TestBlankLineTerminatesWhitespaceLayout(t *testing.T) {
-	diagram, err := Parse("a\n\nb")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if constraints := diagram.Statements[0].Boxes[0].Constraints; len(constraints) != 0 {
-		t.Fatalf("a constraints = %+v", constraints)
-	}
-}
-
-func TestEOFCompletesVerticalWhitespaceLayout(t *testing.T) {
-	diagram, err := Parse("a\nb")
-	if err != nil {
-		t.Fatal(err)
-	}
-	constraints := diagram.Statements[0].Boxes[0].Constraints
-	if len(constraints) != 1 || constraints[0].Relation != ConstraintAbove || constraints[0].Target != "b" {
-		t.Fatalf("a constraints = %+v", constraints)
-	}
-}
-
-func TestArrowStatementsDoNotCreateWhitespaceConstraints(t *testing.T) {
-	diagram, err := Parse("a -> b\nc -> d")
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, statement := range diagram.Statements {
-		if !statement.Connected {
-			t.Fatalf("statement = %+v", statement)
-		}
-		for _, box := range statement.Boxes {
-			if len(box.Constraints) != 0 {
-				t.Fatalf("box %s constraints = %+v", box.Identifier, box.Constraints)
-			}
-		}
+	_, err := Parse("outer[\n  #dir:grid:0x2\n]")
+	if err == nil || !strings.Contains(err.Error(), "line 2, column 3") {
+		t.Fatalf("directive error position = %v", err)
 	}
 }
 
@@ -145,41 +151,10 @@ func TestParserReportsMissingBracket(t *testing.T) {
 	}
 }
 
-func TestParseLayoutConstraints(t *testing.T) {
-	diagram, err := Parse("b['box']@then d,left-of e,right-of c,above f,below a")
-	if err != nil {
-		t.Fatal(err)
-	}
-	box := diagram.Statements[0].Boxes[0]
-	if box.Text == nil || *box.Text != "box" {
-		t.Fatalf("text = %v", box.Text)
-	}
-	wantRelations := []ConstraintRelation{
-		ConstraintThen, ConstraintLeftOf, ConstraintRightOf, ConstraintAbove, ConstraintBelow,
-	}
-	if len(box.Constraints) != len(wantRelations) {
-		t.Fatalf("constraints = %+v", box.Constraints)
-	}
-	for i, want := range wantRelations {
-		if box.Constraints[i].Relation != want {
-			t.Errorf("constraint %d relation = %q, want %q", i, box.Constraints[i].Relation, want)
-		}
-	}
-}
-
-func TestParseRejectsInvalidLayoutConstraints(t *testing.T) {
-	tests := []struct {
-		source string
-		want   string
-	}{
-		{"a@near b", "unknown layout constraint"},
-		{"a@above", "expected identifier after above"},
-		{"a@above b,", "expected layout constraint"},
-	}
-	for _, test := range tests {
-		_, err := Parse(test.source)
-		if err == nil || !strings.Contains(err.Error(), test.want) {
-			t.Errorf("Parse(%q) error = %v, want text %q", test.source, err, test.want)
+func TestParserRejectsUnsupportedPunctuation(t *testing.T) {
+	for _, source := range []string{"a@above b", "a,b", "outer[a@then b]"} {
+		if _, err := Parse(source); err == nil || !strings.Contains(err.Error(), "unexpected character") {
+			t.Errorf("Parse(%q) error = %v, want unexpected character", source, err)
 		}
 	}
 }
