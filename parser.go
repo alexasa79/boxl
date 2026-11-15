@@ -80,11 +80,11 @@ func (p *Parser) parseDiagram(end TokenType) (*Diagram, error) {
 		if p.current.Type == TokenEOF && end == TokenRightBracket {
 			return nil, p.errorf(p.current, "expected ] before end of input")
 		}
-		if p.current.Type == TokenDirective {
+		if p.current.Type == TokenDirective || p.current.Type == TokenIdentifier {
 			continue
 		}
 		if p.current.Type != TokenNewline {
-			return nil, p.errorf(p.current, "expected newline or %s, got %s", end, p.current.Type)
+			return nil, p.errorf(p.current, "expected box, layout directive, newline or %s, got %s", end, p.current.Type)
 		}
 		if _, err := p.consumeNewlines(); err != nil {
 			return nil, err
@@ -113,13 +113,6 @@ func (p *Parser) parseStatement() (Statement, error) {
 		if p.current.Type != TokenIdentifier {
 			return Statement{}, p.errorf(p.current, "expected identifier after ->, got %s", p.current.Type)
 		}
-		box, err := p.parseBox()
-		if err != nil {
-			return Statement{}, err
-		}
-		statement.Boxes = append(statement.Boxes, box)
-	}
-	for !statement.Connected && p.current.Type == TokenIdentifier {
 		box, err := p.parseBox()
 		if err != nil {
 			return Statement{}, err

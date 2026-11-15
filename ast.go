@@ -7,7 +7,7 @@ type Position struct {
 	Column int
 }
 
-// Diagram is a sequence of newline-separated statements.
+// Diagram contains box declarations, connection chains, and an optional layout.
 type Diagram struct {
 	Statements []Statement
 	Layout     *LayoutDirective
@@ -32,7 +32,7 @@ type LayoutDirective struct {
 	Position  Position
 }
 
-// Statement declares boxes or a connection chain.
+// Statement declares a box or a connection chain.
 type Statement struct {
 	Boxes     []BoxExpression
 	Connected bool

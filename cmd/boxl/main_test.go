@@ -78,6 +78,17 @@ func TestRunKittyImageWithMultilineText(t *testing.T) {
 	}
 }
 
+func TestRunKittyImageWithAdjacentConnectionChains(t *testing.T) {
+	const source = `_[a["A"] -> b["B"]-> c["C"] #dir:diag c -> a b -> a]`
+	var stdout, stderr bytes.Buffer
+	if err := run([]string{"-e", source, "-kitty"}, nil, &stdout, &stderr); err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.HasPrefix(stdout.Bytes(), []byte("\x1b_Ga=T,f=100")) {
+		t.Fatal("stdout does not contain a Kitty image")
+	}
+}
+
 func TestRunReadsAndWritesFiles(t *testing.T) {
 	directory := t.TempDir()
 	inputPath := filepath.Join(directory, "diagram.boxl")

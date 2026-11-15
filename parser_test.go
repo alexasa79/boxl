@@ -34,6 +34,66 @@ func TestParseConnectionsAndNesting(t *testing.T) {
 	}
 }
 
+func TestParseAdjacentConnectionChains(t *testing.T) {
+	for _, test := range []struct {
+		source string
+		want   string
+	}{
+		{"a -> b c -> d", "a->b c->d"},
+		{"a b -> c", "a b->c"},
+		{"a['A'] b['B'] -> c['C'] d['D'] -> a", "a b->c d->a"},
+		{"a -> b -> c c -> a b -> a", "a->b->c c->a b->a"},
+	} {
+		t.Run(test.source, func(t *testing.T) {
+			diagram, err := Parse(test.source)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var chains []string
+			for _, statement := range diagram.Statements {
+				var identifiers []string
+				for _, box := range statement.Boxes {
+					identifiers = append(identifiers, box.Identifier)
+				}
+				chains = append(chains, strings.Join(identifiers, "->"))
+			}
+			if got := strings.Join(chains, " "); got != test.want {
+				t.Fatalf("statements = %q, want %q", got, test.want)
+			}
+		})
+	}
+}
+
+func TestParseAdjacentChainsInsideContainer(t *testing.T) {
+	diagram, err := Parse(`_[a["A"] -> b["B"]-> c["C"] #dir:diag c -> a b -> a]`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	inner := diagram.Statements[0].Boxes[0].Diagram
+	if inner.Layout == nil || inner.Layout.Direction != LayoutDiagonal {
+		t.Fatalf("layout = %+v", inner.Layout)
+	}
+	m, err := declarationPass(diagram)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var edges []string
+	for _, edge := range m.edges {
+		edges = append(edges, edge.from.name+"->"+edge.to.name)
+	}
+	if got, want := strings.Join(edges, " "), "a->b b->c c->a b->a"; got != want {
+		t.Fatalf("connections = %q, want %q", got, want)
+	}
+}
+
+func TestParseRejectsIncompleteChains(t *testing.T) {
+	for _, source := range []string{"a ->", "a -> -> b", "a -> b c ->", "outer[a -> b c ->]"} {
+		if _, err := Parse(source); err == nil || !strings.Contains(err.Error(), "expected identifier after ->") {
+			t.Errorf("Parse(%q) error = %v, want missing arrow target", source, err)
+		}
+	}
+}
+
 func TestParseEmptyDiagramAndContainer(t *testing.T) {
 	diagram, err := Parse("empty[]")
 	if err != nil {

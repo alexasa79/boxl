@@ -16,6 +16,7 @@ renders a diagram to `out.png` by default.
 Boxes are arranged from left to right by default, equivalent to `#dir:row`.
 Boxes are ordered by their first appearance in the source, and repeated
 references occupy one cell. Use `->` to connect boxes.
+Multiple connection chains can share a line, as in `a -> b c -> a`.
 
 Use a directive to choose the layout of a chart or a containing box:
 
