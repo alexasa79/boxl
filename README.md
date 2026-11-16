@@ -57,9 +57,12 @@ lower[e f]
 
 Arrows leave a gap at both boxes. Forward connections use straight arrows when
 the path is clear. Return connections and forward connections blocked by other
-boxes curve around them. The renderer chooses a clear side and gives additional
-curves wider bends. Arrowheads follow the direction of the line or curve.
-Containing boxes expand to include their arrows.
+boxes curve around them. The renderer considers both sides and several bend
+sizes, choosing routes together to minimize arrow crossings, overlapping paths,
+and arrowhead collisions. Simpler, shorter routes break ties. The search has a
+fixed computation budget and retains the best combination found. Arrowheads
+follow the direction of the line or curve. Containing boxes expand to include
+their arrows.
 
 ## Command line
 

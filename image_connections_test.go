@@ -7,6 +7,10 @@ import (
 )
 
 func testConnectionRoutes(t *testing.T, source string) (*imageRenderer, []imageConnectionRoute, []imagePlacement) {
+	return testConnectionRoutesWithBoxSize(t, source, imageEmptyBoxSize, imageEmptyBoxSize)
+}
+
+func testConnectionRoutesWithBoxSize(t *testing.T, source string, width, height int) (*imageRenderer, []imageConnectionRoute, []imagePlacement) {
 	t.Helper()
 	diagram, err := Parse(source)
 	if err != nil {
@@ -31,9 +35,9 @@ func testConnectionRoutes(t *testing.T, source string) (*imageRenderer, []imageC
 	for _, child := range children {
 		position := grid[child]
 		box := imagePlacement{
-			x:     position.column * (imageEmptyBoxSize + imageHorizontalGap),
-			y:     position.row * (imageEmptyBoxSize + imageVerticalGap),
-			image: image.NewRGBA(image.Rect(0, 0, imageEmptyBoxSize, imageEmptyBoxSize)),
+			x:     position.column * (width + imageHorizontalGap),
+			y:     position.row * (height + imageVerticalGap),
+			image: image.NewRGBA(image.Rect(0, 0, width, height)),
 		}
 		placements[child] = box
 		boxes = append(boxes, box)
@@ -139,10 +143,11 @@ func TestReturnCurvesUseSeparateLanes(t *testing.T) {
 func TestCurveChoosesClearSide(t *testing.T) {
 	r, _, boxes := testConnectionRoutes(t, "a b c")
 	obstacle := imagePlacement{x: 80, y: -90, image: image.NewRGBA(image.Rect(0, 0, 90, 80))}
-	route, ok := r.curvedConnection(boxes[2], boxes[0], append(boxes, obstacle), 0)
-	if !ok {
+	routes := r.curvedConnections(boxes[2], boxes[0], append(boxes, obstacle))
+	if len(routes) == 0 {
 		t.Fatal("no route around obstacle")
 	}
+	route := r.chooseConnectionRoutes([][]imageConnectionRoute{routes})[0]
 	if middle := route.points[len(route.points)/2]; middle.y <= imageEmptyBoxSize {
 		t.Fatalf("curve did not choose the clear lower side: %+v", middle)
 	}

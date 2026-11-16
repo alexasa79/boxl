@@ -52,30 +52,28 @@ func (r *imageRenderer) routeConnections(children []*declaredBox, edges []connec
 		order[child] = i
 		boxes = append(boxes, placements[child])
 	}
-	routes := make([]imageConnectionRoute, 0, len(edges))
-	curves := 0
+	candidates := make([][]imageConnectionRoute, 0, len(edges))
 	for _, edge := range edges {
 		from, to := placements[edge.from], placements[edge.to]
+		var options []imageConnectionRoute
 		if order[edge.to] > order[edge.from] {
 			start := r.connectionAnchor(from, imageBoxCenter(to))
 			end := r.connectionAnchor(to, imageBoxCenter(from))
 			straight := imageConnectionRoute{points: []imagePoint{start, end}, tangent: end.sub(start).unit()}
 			if r.connectionIsClear(straight, boxes) {
-				routes = append(routes, straight)
-				continue
+				options = append(options, straight)
 			}
 		}
-		route, ok := r.curvedConnection(from, to, boxes, curves)
-		if !ok {
+		options = append(options, r.curvedConnections(from, to, boxes)...)
+		if len(options) == 0 {
 			return nil, modelError(edge.position, "cannot route connection %q -> %q without crossing a box", edge.from.name, edge.to.name)
 		}
-		curves++
-		routes = append(routes, route)
+		candidates = append(candidates, options)
 	}
-	return routes, nil
+	return r.chooseConnectionRoutes(candidates), nil
 }
 
-func (r *imageRenderer) curvedConnection(from, to imagePlacement, boxes []imagePlacement, lane int) (imageConnectionRoute, bool) {
+func (r *imageRenderer) curvedConnections(from, to imagePlacement, boxes []imagePlacement) []imageConnectionRoute {
 	startCenter, endCenter := imageBoxCenter(from), imageBoxCenter(to)
 	delta := endCenter.sub(startCenter)
 	direction := delta.unit()
@@ -85,10 +83,10 @@ func (r *imageRenderer) curvedConnection(from, to imagePlacement, boxes []imageP
 	}
 	spacing := float64(max(r.arrowGapX, r.arrowGapY) * 4)
 	bend := math.Max(float64(r.horizontalGap), math.Max(extent(from), extent(to))+spacing)
-	bend += float64(lane) * spacing
+	var routes []imageConnectionRoute
+	clearLevels := 0
 	for attempt := 0; attempt < 24; attempt++ {
-		var best imageConnectionRoute
-		bestLength := math.Inf(1)
+		found := false
 		for _, side := range []float64{1, -1} {
 			var start, c1, c2, end imagePoint
 			if delta.length() == 0 {
@@ -108,17 +106,19 @@ func (r *imageRenderer) curvedConnection(from, to imagePlacement, boxes []imageP
 			}
 			route := cubicConnection(start, c1, c2, end)
 			if r.connectionIsClear(route, boxes) {
-				if length := connectionLength(route.points); length < bestLength {
-					best, bestLength = route, length
-				}
+				routes = append(routes, route)
+				found = true
 			}
 		}
-		if !math.IsInf(bestLength, 1) {
-			return best, true
+		if found {
+			clearLevels++
+			if clearLevels == 6 {
+				break
+			}
 		}
 		bend *= 1.35
 	}
-	return imageConnectionRoute{}, false
+	return routes
 }
 
 func cubicConnection(start, c1, c2, end imagePoint) imageConnectionRoute {
