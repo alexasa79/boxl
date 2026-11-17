@@ -28,7 +28,7 @@ func (p *Parser) Parse() (*Diagram, error) {
 	if err := p.start(); err != nil {
 		return nil, err
 	}
-	diagram, err := p.parseDiagram(TokenEOF)
+	diagram, err := p.parseDiagram(TokenEOF, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -43,7 +43,7 @@ func (p *Parser) start() error {
 	return p.advance()
 }
 
-func (p *Parser) parseDiagram(end TokenType) (*Diagram, error) {
+func (p *Parser) parseDiagram(end TokenType, text **string) (*Diagram, error) {
 	diagram := &Diagram{}
 	if _, err := p.consumeNewlines(); err != nil {
 		return nil, err
@@ -56,18 +56,30 @@ func (p *Parser) parseDiagram(end TokenType) (*Diagram, error) {
 			break
 		}
 		if p.current.Type == TokenDirective {
-			if diagram.Layout != nil {
-				return nil, p.errorf(p.current, "only one layout directive is allowed per diagram")
-			}
-			layout, err := p.parseLayoutDirective()
-			if err != nil {
+			if err := p.parseDirective(diagram); err != nil {
 				return nil, err
 			}
-			diagram.Layout = layout
 			if _, err := p.consumeNewlines(); err != nil {
 				return nil, err
 			}
 			continue
+		}
+		if p.current.Type == TokenString && text != nil {
+			if *text != nil || len(diagram.Statements) != 0 {
+				return nil, p.errorf(p.current, "a box may contain one quoted label or nested boxes")
+			}
+			label := p.current.Value
+			*text = &label
+			if err := p.advance(); err != nil {
+				return nil, err
+			}
+			if _, err := p.consumeNewlines(); err != nil {
+				return nil, err
+			}
+			continue
+		}
+		if text != nil && *text != nil {
+			return nil, p.errorf(p.current, "a box cannot have both quoted text and nested boxes")
 		}
 		statement, err := p.parseStatement()
 		if err != nil {
@@ -80,11 +92,11 @@ func (p *Parser) parseDiagram(end TokenType) (*Diagram, error) {
 		if p.current.Type == TokenEOF && end == TokenRightBracket {
 			return nil, p.errorf(p.current, "expected ] before end of input")
 		}
-		if p.current.Type == TokenDirective || p.current.Type == TokenIdentifier {
+		if p.current.Type == TokenDirective || p.current.Type == TokenIdentifier || (p.current.Type == TokenString && text != nil) {
 			continue
 		}
 		if p.current.Type != TokenNewline {
-			return nil, p.errorf(p.current, "expected box, layout directive, newline or %s, got %s", end, p.current.Type)
+			return nil, p.errorf(p.current, "expected box, directive, newline or %s, got %s", end, p.current.Type)
 		}
 		if _, err := p.consumeNewlines(); err != nil {
 			return nil, err
@@ -187,27 +199,19 @@ func (p *Parser) parseBox() (BoxExpression, error) {
 		if err := p.advance(); err != nil {
 			return BoxExpression{}, err
 		}
-		if p.current.Type == TokenString {
-			text := p.current.Value
-			box.Text = &text
-			if err := p.advance(); err != nil {
-				return BoxExpression{}, err
-			}
-			if p.current.Type != TokenRightBracket {
-				return BoxExpression{}, p.errorf(p.current, "expected ] after quoted text, got %s", p.current.Type)
-			}
-			if err := p.advance(); err != nil {
-				return BoxExpression{}, err
-			}
-		} else {
-			diagram, err := p.parseDiagram(TokenRightBracket)
-			if err != nil {
-				return BoxExpression{}, err
-			}
+		diagram, err := p.parseDiagram(TokenRightBracket, &box.Text)
+		if err != nil {
+			return BoxExpression{}, err
+		}
+		box.Style = diagram.Style
+		diagram.Style = BoxStyle{}
+		if box.Text == nil {
 			box.Diagram = diagram
-			if err := p.advance(); err != nil {
-				return BoxExpression{}, err
-			}
+		} else if diagram.Layout != nil {
+			return BoxExpression{}, modelError(diagram.Layout.Position, "layout directives require nested boxes")
+		}
+		if err := p.advance(); err != nil {
+			return BoxExpression{}, err
 		}
 	}
 

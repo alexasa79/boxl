@@ -40,7 +40,7 @@ c d
 
 This arranges `a` and `b` in the first row, with `c` and `d` in the second.
 
-Each diagram can have one directive, anywhere among its statements. A directive
+Each diagram can have one layout directive, anywhere among its statements. It
 applies to that entire diagram, without being inherited by nested boxes:
 
 ```text
@@ -64,6 +64,30 @@ fixed computation budget and retains the best combination found. Arrowheads
 follow the direction of the line or curve. Containing boxes expand to include
 their arrows.
 
+## Box appearance
+
+Names starting with `_`, such as `_` or `_group`, hide the box border. These
+containers keep their contents, padding, and layout space.
+
+Use `#bg` to fill a box and `#fg` to color its border, text, and arrows. Place
+the directives inside the box's brackets. Foreground colors are inherited by
+child boxes, which can override them. Background colors apply to the box that
+declares them. At the top level, they style the chart.
+
+```text
+_[
+    #bg:white #fg:black #dir:diag
+    a["A" #bg:rgb(240, 240, 240)] -> b["B" #bg:#33669980]
+]
+```
+
+Colors accept names such as `white`, `black`, and `red`; `rgb(R,G,B)` with
+integer channels from 0 to 255; `#RGB`; `#RRGGBB`; and `#RRGGBBAA`. The last
+two hexadecimal digits of `#RRGGBBAA` specify alpha, from `00` for transparent
+to `FF` for opaque. The name `transparent` is also supported. Names and hex
+digits are case-insensitive. Each box or chart can declare one `#bg` and one
+`#fg` directive. Explicit background fills also apply to borderless containers.
+
 ## Command line
 
 ```sh
@@ -81,7 +105,7 @@ directory. Use `-o` to choose a different output file.
 `-kitty` draws geometric boxes, arrows, nesting, and labels into a PNG, then
 transmits it directly with the Kitty graphics protocol. The switch works with
 stdin, a source file, and `-e`; the terminal must support the protocol.
-Graphical output uses a transparent
+By default, graphical output uses a transparent
 background with white boxes, arrows, and text for dark terminal backgrounds.
 
 When writing directly to a terminal, boxl obtains its physical cell dimensions

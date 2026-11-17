@@ -36,11 +36,34 @@ const (
 )
 
 var (
-	imageBackground    = color.RGBA{}
-	imageBoxFill       = color.RGBA{}
-	imageContainerFill = color.RGBA{}
-	imageStroke        = color.RGBA{R: 255, G: 255, B: 255, A: 255}
+	imageBackground = color.RGBA{}
+	imageStroke     = color.RGBA{R: 255, G: 255, B: 255, A: 255}
 )
+
+type imageBoxStyle struct {
+	background, foreground color.Color
+	visibleBorder          bool
+}
+
+func resolveImageStyle(m *model, box *declaredBox) imageBoxStyle {
+	style := imageBoxStyle{background: imageBackground, foreground: imageStroke}
+	if box != nil {
+		style.visibleBorder = !strings.HasPrefix(box.name, "_")
+	}
+	if background := m.styles[box].Background; background != nil {
+		style.background = background.Color
+	}
+	for scope := box; ; scope = scope.parent {
+		if foreground := m.styles[scope].Foreground; foreground != nil {
+			style.foreground = foreground.Color
+			break
+		}
+		if scope == nil {
+			break
+		}
+	}
+	return style
+}
 
 type imageRenderer struct {
 	face              font.Face
@@ -107,10 +130,10 @@ func renderKittyPNGSource(source string, cellSize KittyCellSize) ([]byte, int, i
 	targetHeight := rows * cellSize.Height
 	if targetWidth != rendered.Bounds().Dx() || targetHeight != rendered.Bounds().Dy() {
 		padded := image.NewRGBA(image.Rect(0, 0, targetWidth, targetHeight))
-		fillImage(padded, imageBackground)
+		fillImage(padded, rendered.At(0, 0))
 		left := (targetWidth - rendered.Bounds().Dx()) / 2
 		top := (targetHeight - rendered.Bounds().Dy()) / 2
-		draw.Draw(padded, rendered.Bounds().Add(image.Pt(left, top)), rendered, image.Point{}, draw.Over)
+		draw.Draw(padded, rendered.Bounds().Add(image.Pt(left, top)), rendered, image.Point{}, draw.Src)
 		rendered = padded
 	}
 	data, err := encodePNG(rendered)
@@ -142,7 +165,7 @@ func renderImageSource(source string, scaleX, scaleY float64) (*image.RGBA, erro
 	width := diagramImage.Bounds().Dx() + 2*renderer.outerMarginX
 	height := diagramImage.Bounds().Dy() + 2*renderer.outerMarginY
 	output := image.NewRGBA(image.Rect(0, 0, width, height))
-	fillImage(output, imageBackground)
+	fillImage(output, resolveImageStyle(m, nil).background)
 	draw.Draw(output, diagramImage.Bounds().Add(image.Pt(renderer.outerMarginX, renderer.outerMarginY)), diagramImage, image.Point{}, draw.Over)
 	return output, nil
 }
@@ -220,14 +243,15 @@ func (r *imageRenderer) renderScope(m *model, scope *declaredBox, metrics imageL
 
 	boxImages := make(map[*declaredBox]*image.RGBA, len(children))
 	for _, box := range children {
+		style := resolveImageStyle(m, box)
 		if box.container {
 			inside, err := r.renderScope(m, box, metrics)
 			if err != nil {
 				return nil, err
 			}
-			boxImages[box] = r.containerImage(inside)
+			boxImages[box] = r.containerImage(inside, style)
 		} else {
-			boxImages[box] = r.leafImage(box, metrics)
+			boxImages[box] = r.leafImage(box, metrics, style)
 		}
 	}
 
@@ -283,8 +307,9 @@ func (r *imageRenderer) renderScope(m *model, scope *declaredBox, metrics imageL
 	}
 	offset := imagePoint{x: float64(-bounds.Min.X), y: float64(-bounds.Min.Y)}
 	result := image.NewRGBA(image.Rect(0, 0, bounds.Dx(), bounds.Dy()))
+	foreground := resolveImageStyle(m, scope).foreground
 	for _, route := range routes {
-		r.drawConnectionRoute(result, route, offset)
+		r.drawConnectionRoute(result, route, offset, foreground)
 	}
 	for _, box := range children {
 		placement := placements[box]
@@ -294,18 +319,18 @@ func (r *imageRenderer) renderScope(m *model, scope *declaredBox, metrics imageL
 	return result, nil
 }
 
-func (r *imageRenderer) leafImage(box *declaredBox, metrics imageLeafMetrics) *image.RGBA {
+func (r *imageRenderer) leafImage(box *declaredBox, metrics imageLeafMetrics, style imageBoxStyle) *image.RGBA {
 	if isEmptyImageBox(box) {
 		result := image.NewRGBA(image.Rect(0, 0, r.emptyBoxWidth, r.emptyBoxHeight))
-		r.drawImageBox(result, imageBoxFill)
+		r.drawImageBox(result, style)
 		return result
 	}
 	result := image.NewRGBA(image.Rect(0, 0, metrics.width, metrics.height))
-	r.drawImageBox(result, imageBoxFill)
+	r.drawImageBox(result, style)
 	lines := labelLines(box.text)
 	textHeight := len(lines) * r.lineHeight
 	firstBaseline := (metrics.height-textHeight)/2 + r.ascent
-	drawer := font.Drawer{Dst: result, Src: image.NewUniform(imageStroke), Face: r.face}
+	drawer := font.Drawer{Dst: result, Src: image.NewUniform(style.foreground), Face: r.face}
 	for i, line := range lines {
 		textWidth := font.MeasureString(r.face, line).Ceil()
 		drawer.Dot = fixed.P((metrics.width-textWidth)/2, firstBaseline+i*r.lineHeight)
@@ -314,16 +339,16 @@ func (r *imageRenderer) leafImage(box *declaredBox, metrics imageLeafMetrics) *i
 	return result
 }
 
-func (r *imageRenderer) containerImage(inside *image.RGBA) *image.RGBA {
+func (r *imageRenderer) containerImage(inside *image.RGBA, style imageBoxStyle) *image.RGBA {
 	if inside.Bounds().Empty() {
 		result := image.NewRGBA(image.Rect(0, 0, r.emptyBoxWidth, r.emptyBoxHeight))
-		r.drawImageBox(result, imageContainerFill)
+		r.drawImageBox(result, style)
 		return result
 	}
 	width := inside.Bounds().Dx() + 2*r.containerPaddingX
 	height := inside.Bounds().Dy() + 2*r.containerPaddingY
 	result := image.NewRGBA(image.Rect(0, 0, width, height))
-	r.drawImageBox(result, imageContainerFill)
+	r.drawImageBox(result, style)
 	left := (width - inside.Bounds().Dx()) / 2
 	top := (height - inside.Bounds().Dy()) / 2
 	draw.Draw(result, inside.Bounds().Add(image.Pt(left, top)), inside, image.Point{}, draw.Over)
@@ -334,13 +359,16 @@ func isEmptyImageBox(box *declaredBox) bool {
 	return box.text == nil || *box.text == ""
 }
 
-func (r *imageRenderer) drawImageBox(target *image.RGBA, fill color.Color) {
-	fillImage(target, fill)
+func (r *imageRenderer) drawImageBox(target *image.RGBA, style imageBoxStyle) {
+	fillImage(target, style.background)
+	if !style.visibleBorder {
+		return
+	}
 	bounds := target.Bounds()
-	fillRectangle(target, image.Rect(0, 0, bounds.Dx(), r.lineWidth), imageStroke)
-	fillRectangle(target, image.Rect(0, bounds.Dy()-r.lineWidth, bounds.Dx(), bounds.Dy()), imageStroke)
-	fillRectangle(target, image.Rect(0, 0, r.lineWidth, bounds.Dy()), imageStroke)
-	fillRectangle(target, image.Rect(bounds.Dx()-r.lineWidth, 0, bounds.Dx(), bounds.Dy()), imageStroke)
+	fillRectangle(target, image.Rect(0, 0, bounds.Dx(), r.lineWidth), style.foreground)
+	fillRectangle(target, image.Rect(0, bounds.Dy()-r.lineWidth, bounds.Dx(), bounds.Dy()), style.foreground)
+	fillRectangle(target, image.Rect(0, 0, r.lineWidth, bounds.Dy()), style.foreground)
+	fillRectangle(target, image.Rect(bounds.Dx()-r.lineWidth, 0, bounds.Dx(), bounds.Dy()), style.foreground)
 }
 
 func fillImage(target *image.RGBA, fill color.Color) {

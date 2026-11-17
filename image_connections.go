@@ -2,6 +2,7 @@ package boxl
 
 import (
 	"image"
+	"image/color"
 	"math"
 
 	"golang.org/x/image/vector"
@@ -205,7 +206,7 @@ func (r *imageRenderer) connectionBounds(route imageConnectionRoute) image.Recta
 	return image.Rect(int(math.Floor(minX)), int(math.Floor(minY)), int(math.Ceil(maxX))+1, int(math.Ceil(maxY))+1)
 }
 
-func (r *imageRenderer) drawConnectionRoute(target *image.RGBA, route imageConnectionRoute, offset imagePoint) {
+func (r *imageRenderer) drawConnectionRoute(target *image.RGBA, route imageConnectionRoute, offset imagePoint, foreground color.Color) {
 	head := r.connectionArrowhead(route)
 	base := head[1].add(head[2]).mul(0.5)
 	remaining := connectionLength(route.points) - head[0].sub(base).length()
@@ -229,11 +230,11 @@ func (r *imageRenderer) drawConnectionRoute(target *image.RGBA, route imageConne
 	for i := len(right) - 1; i >= 0; i-- {
 		outline = append(outline, right[i])
 	}
-	drawConnectionPolygon(target, outline, offset)
-	drawConnectionPolygon(target, head[:], offset)
+	drawConnectionPolygon(target, outline, offset, foreground)
+	drawConnectionPolygon(target, head[:], offset, foreground)
 }
 
-func drawConnectionPolygon(target *image.RGBA, points []imagePoint, offset imagePoint) {
+func drawConnectionPolygon(target *image.RGBA, points []imagePoint, offset imagePoint, foreground color.Color) {
 	rasterizer := vector.NewRasterizer(target.Bounds().Dx(), target.Bounds().Dy())
 	for i, point := range points {
 		x, y := float32(point.x+offset.x)+0.5, float32(point.y+offset.y)+0.5
@@ -244,5 +245,5 @@ func drawConnectionPolygon(target *image.RGBA, points []imagePoint, offset image
 		}
 	}
 	rasterizer.ClosePath()
-	rasterizer.Draw(target, target.Bounds(), image.NewUniform(imageStroke), image.Point{})
+	rasterizer.Draw(target, target.Bounds(), image.NewUniform(foreground), image.Point{})
 }

@@ -94,3 +94,19 @@ func TestTokenizeLayoutDirective(t *testing.T) {
 		t.Fatalf("closing token = %+v", tokens[3])
 	}
 }
+
+func TestTokenizeColorDirectives(t *testing.T) {
+	tokens, err := Tokenize("a[#bg:rgb(1, 2, 3) #fg:#aabbcc80 'A'] -> b")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if tokens[2].Type != TokenDirective || tokens[2].Value != "bg:rgb(1, 2, 3)" || tokens[3].Value != "fg:#aabbcc80" {
+		t.Fatalf("color tokens = %+v", tokens)
+	}
+	if tokens[4].Type != TokenString || tokens[6].Type != TokenArrow {
+		t.Fatalf("tokens after colors = %+v", tokens)
+	}
+	if tokens[6].Position.Column != 39 {
+		t.Fatalf("arrow position = %+v", tokens[6].Position)
+	}
+}

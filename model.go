@@ -9,6 +9,7 @@ type model struct {
 	order   []*declaredBox
 	edges   []connection
 	layouts map[*declaredBox]*LayoutDirective
+	styles  map[*declaredBox]BoxStyle
 }
 
 type declaredBox struct {
@@ -36,6 +37,7 @@ func declarationPass(diagram *Diagram) (*model, error) {
 	m := &model{
 		boxes:   make(map[string]*declaredBox),
 		layouts: make(map[*declaredBox]*LayoutDirective),
+		styles:  make(map[*declaredBox]BoxStyle),
 	}
 	if err := m.declareDiagram(diagram, nil); err != nil {
 		return nil, err
@@ -50,6 +52,9 @@ func declarationPass(diagram *Diagram) (*model, error) {
 }
 
 func (m *model) declareDiagram(diagram *Diagram, scope *declaredBox) error {
+	if err := m.declareStyle(scope, diagram.Style); err != nil {
+		return err
+	}
 	if layout := diagram.Layout; layout != nil {
 		if previous := m.layouts[scope]; previous != nil &&
 			(previous.Direction != layout.Direction || previous.Rows != layout.Rows || previous.Columns != layout.Columns) {
@@ -83,6 +88,9 @@ func (m *model) declareBox(expression *BoxExpression, scope *declaredBox) (*decl
 	if err != nil {
 		return nil, err
 	}
+	if err := m.declareStyle(box, expression.Style); err != nil {
+		return nil, err
+	}
 
 	if expression.Text != nil {
 		if box.container {
@@ -109,6 +117,32 @@ func (m *model) declareBox(expression *BoxExpression, scope *declaredBox) (*decl
 	}
 
 	return box, nil
+}
+
+func (m *model) declareStyle(box *declaredBox, style BoxStyle) error {
+	previous := m.styles[box]
+	merge := func(target **ColorDirective, value *ColorDirective, name string) error {
+		if value == nil {
+			return nil
+		}
+		if *target != nil && (*target).Color != value.Color {
+			targetName := "chart"
+			if box != nil {
+				targetName = fmt.Sprintf("box %q", box.name)
+			}
+			return modelError(value.Position, "conflicting #%s colors for %s", name, targetName)
+		}
+		*target = value
+		return nil
+	}
+	if err := merge(&previous.Background, style.Background, "bg"); err != nil {
+		return err
+	}
+	if err := merge(&previous.Foreground, style.Foreground, "fg"); err != nil {
+		return err
+	}
+	m.styles[box] = previous
+	return nil
 }
 
 func (m *model) declareReference(name string, position Position, scope *declaredBox) (*declaredBox, error) {

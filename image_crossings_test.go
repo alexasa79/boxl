@@ -69,7 +69,7 @@ func assertRenderedRoutesDoNotOverlap(t *testing.T, r *imageRenderer, routes []i
 	owners := make([]bool, bounds.Dx()*bounds.Dy())
 	for i, route := range routes {
 		canvas := image.NewRGBA(image.Rect(0, 0, bounds.Dx(), bounds.Dy()))
-		r.drawConnectionRoute(canvas, route, imagePoint{float64(-bounds.Min.X), float64(-bounds.Min.Y)})
+		r.drawConnectionRoute(canvas, route, imagePoint{float64(-bounds.Min.X), float64(-bounds.Min.Y)}, imageStroke)
 		for y := 0; y < canvas.Bounds().Dy(); y++ {
 			for x := 0; x < canvas.Bounds().Dx(); x++ {
 				if canvas.RGBAAt(x, y).A <= 32 {

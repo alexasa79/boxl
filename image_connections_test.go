@@ -106,7 +106,7 @@ func assertRenderedRoutesClearBoxes(t *testing.T, r *imageRenderer, routes []ima
 	canvas := image.NewRGBA(image.Rect(0, 0, bounds.Dx()+2*margin, bounds.Dy()+2*margin))
 	offset := imagePoint{float64(margin - bounds.Min.X), float64(margin - bounds.Min.Y)}
 	for _, route := range routes {
-		r.drawConnectionRoute(canvas, route, offset)
+		r.drawConnectionRoute(canvas, route, offset, imageStroke)
 	}
 	for _, box := range boxes {
 		for y := 0; y < box.image.Bounds().Dy(); y++ {

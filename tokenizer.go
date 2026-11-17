@@ -35,7 +35,7 @@ func (t TokenType) String() string {
 	case TokenRightBracket:
 		return "]"
 	case TokenDirective:
-		return "layout directive"
+		return "directive"
 	case TokenNewline:
 		return "newline"
 	case TokenEOF:
@@ -145,10 +145,16 @@ func (t *Tokenizer) Next() (Token, error) {
 func (t *Tokenizer) scanDirective() Token {
 	start := t.position()
 	startOffset := t.offset
+	parentheses := 0
 	for t.offset < len(t.input) {
 		r, size := utf8.DecodeRuneInString(t.input[t.offset:])
-		if unicode.IsSpace(r) || r == '[' || r == ']' {
+		if r == '\r' || r == '\n' || r == '[' || r == ']' || (unicode.IsSpace(r) && parentheses == 0) {
 			break
+		}
+		if r == '(' {
+			parentheses++
+		} else if r == ')' && parentheses > 0 {
+			parentheses--
 		}
 		t.advanceRune(r, size)
 	}
