@@ -16,17 +16,50 @@ type Diagram struct {
 	Style      BoxStyle
 }
 
-// BoxStyle sets a box's fill and its inheritable foreground color.
+// BoxStyle contains explicit colors, a palette, and an optional pair selection.
 type BoxStyle struct {
 	Background *ColorDirective
 	Foreground *ColorDirective
+	Palette    *PaletteDirective
+	Pair       *ColorDirective
 }
 
-// ColorDirective stores a straight-alpha color and its source position.
-type ColorDirective struct {
-	Color    color.NRGBA
+// PaletteDirective selects the palette inherited by a box's descendants.
+type PaletteDirective struct {
+	Name     string
 	Position Position
 }
+
+// ColorDirective stores a color expression and its source position. Color is
+// also populated for expressions that can be evaluated without a palette.
+type ColorDirective struct {
+	Color      color.NRGBA
+	Expression Expression
+	Position   Position
+}
+
+// Expression is a value used by a directive.
+type Expression interface{ expression() }
+
+// ColorLiteral is a color independent of the current palette.
+type ColorLiteral struct{ Value color.NRGBA }
+
+// IntegerLiteral is a numeric function argument.
+type IntegerLiteral struct{ Value int }
+
+// VariableExpression names a value without its leading $.
+type VariableExpression struct{ Name string }
+
+// CallExpression records a function and its unevaluated arguments.
+type CallExpression struct {
+	Name      string
+	Arguments []Expression
+}
+
+func (ColorLiteral) expression()       {}
+func (IntegerLiteral) expression()     {}
+func (VariableExpression) expression() {}
+func (CallExpression) expression()     {}
 
 // LayoutDirection selects how a diagram arranges its immediate children.
 type LayoutDirection string

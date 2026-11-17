@@ -5,11 +5,12 @@ import "fmt"
 // model is built during rendering pass one. A single declaredBox is shared by
 // every occurrence of the same identifier.
 type model struct {
-	boxes   map[string]*declaredBox
-	order   []*declaredBox
-	edges   []connection
-	layouts map[*declaredBox]*LayoutDirective
-	styles  map[*declaredBox]BoxStyle
+	boxes          map[string]*declaredBox
+	order          []*declaredBox
+	edges          []connection
+	layouts        map[*declaredBox]*LayoutDirective
+	styles         map[*declaredBox]BoxStyle
+	resolvedStyles map[*declaredBox]resolvedBoxColors
 }
 
 type declaredBox struct {
@@ -46,6 +47,9 @@ func declarationPass(diagram *Diagram) (*model, error) {
 		return nil, err
 	}
 	if err := m.validateConnections(); err != nil {
+		return nil, err
+	}
+	if err := m.resolveColorStyles(); err != nil {
 		return nil, err
 	}
 	return m, nil
@@ -125,14 +129,16 @@ func (m *model) declareStyle(box *declaredBox, style BoxStyle) error {
 		if value == nil {
 			return nil
 		}
-		if *target != nil && (*target).Color != value.Color {
+		if *target != nil && !sameColorDirective(*target, value) {
 			targetName := "chart"
 			if box != nil {
 				targetName = fmt.Sprintf("box %q", box.name)
 			}
 			return modelError(value.Position, "conflicting #%s colors for %s", name, targetName)
 		}
-		*target = value
+		if *target == nil {
+			*target = value
+		}
 		return nil
 	}
 	if err := merge(&previous.Background, style.Background, "bg"); err != nil {
@@ -140,6 +146,17 @@ func (m *model) declareStyle(box *declaredBox, style BoxStyle) error {
 	}
 	if err := merge(&previous.Foreground, style.Foreground, "fg"); err != nil {
 		return err
+	}
+	if err := merge(&previous.Pair, style.Pair, "colors"); err != nil {
+		return err
+	}
+	if palette := style.Palette; palette != nil {
+		if previous.Palette != nil && previous.Palette.Name != palette.Name {
+			return modelError(palette.Position, "conflicting palette declarations in %s", scopeLabel(box))
+		}
+		if previous.Palette == nil {
+			previous.Palette = palette
+		}
 	}
 	m.styles[box] = previous
 	return nil

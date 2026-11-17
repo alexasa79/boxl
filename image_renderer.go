@@ -46,21 +46,10 @@ type imageBoxStyle struct {
 }
 
 func resolveImageStyle(m *model, box *declaredBox) imageBoxStyle {
-	style := imageBoxStyle{background: imageBackground, foreground: imageStroke}
+	colors := m.resolvedStyles[box]
+	style := imageBoxStyle{background: colors.background, foreground: colors.foreground}
 	if box != nil {
 		style.visibleBorder = !strings.HasPrefix(box.name, "_")
-	}
-	if background := m.styles[box].Background; background != nil {
-		style.background = background.Color
-	}
-	for scope := box; ; scope = scope.parent {
-		if foreground := m.styles[scope].Foreground; foreground != nil {
-			style.foreground = foreground.Color
-			break
-		}
-		if scope == nil {
-			break
-		}
 	}
 	return style
 }

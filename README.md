@@ -70,9 +70,9 @@ Names starting with `_`, such as `_` or `_group`, hide the box border. These
 containers keep their contents, padding, and layout space.
 
 Use `#bg` to fill a box and `#fg` to color its border, text, and arrows. Place
-the directives inside the box's brackets. Foreground colors are inherited by
-child boxes, which can override them. Background colors apply to the box that
-declares them. At the top level, they style the chart.
+the directives inside the box's brackets. Foreground colors carry into child
+boxes unless a palette assigns a new pair at the next level. Background colors
+apply to the box that declares them. At the top level, they style the chart.
 
 ```text
 _[
@@ -87,6 +87,86 @@ two hexadecimal digits of `#RRGGBBAA` specify alpha, from `00` for transparent
 to `FF` for opaque. The name `transparent` is also supported. Names and hex
 digits are case-insensitive. Each box or chart can declare one `#bg` and one
 `#fg` directive. Explicit background fills also apply to borderless containers.
+
+## Palettes and color expressions
+
+`#palette:pastel`, `#theme:pastel`, and `#colors:pastel` select the same palette.
+The available palettes are:
+
+| Palette | Colors |
+| --- | --- |
+| `pastel` | Mixed soft colors |
+| `earth` | Moss, clay, ochre, and woodland colors |
+| `ocean` | Blues, teals, sea greens, and indigo |
+
+Each contains 16 pairs, with a pale background and a darker foreground for the
+border and text. For example, `#theme:ocean` selects the ocean palette.
+Top-level boxes start with pair 1. Siblings share the
+current pair, and children start with the next pair. After pair 16, the palette
+wraps to pair 1.
+
+Use `#colors:$color3` to select both components of pair 3 for a box.
+`#colorpair:$color3` is an alias. A change carries forward to later siblings
+inside the same containing box:
+
+```text
+#palette:pastel
+A[
+    B["B"]
+    C["C" #colors:$color5]
+    E["E"]
+]
+D[F["F"]]
+```
+
+`A` and `D` use pair 1. `B` and `F` use pair 2. `C` selects pair 5, which `E`
+keeps. Changes inside `A` stay in that sibling group. A palette declared inside
+a box starts that box at pair 1 and applies to its descendants. Borderless
+containers participate in palette depth and receive palette fills.
+Switching palettes inside a box stays local to that box and its descendants.
+
+`$color1` through `$color16` reference pairs in the active palette.
+`#bg:$color3` selects pair 3's background, while `#fg:$color3` selects its
+foreground. These lookups do not advance the palette. Literal `#bg` and `#fg`
+overrides also carry forward to later siblings when a palette is active.
+
+`nextcolors()` returns the next pair and advances the current sibling group's
+palette position. Selecting a whole pair sets that position, so after
+`#colors:$color5`, `#colors:nextcolors()` selects pair 6. Child groups advance
+independently. Expressions within a box run in source order; each call advances
+once. The `rgb(R,G,B)` function returns a literal color.
+
+```text
+#theme:pastel
+a["A"]
+b["B" #colors:nextcolors()]
+c["C"]
+```
+
+`a` uses pair 1; `b` advances to pair 2; `c` keeps pair 2. Palette variables
+and `nextcolors()` require an active palette. At chart level, palette selection
+keeps the canvas transparent; use `#bg` to fill it.
+
+The `pastel` pairs are:
+
+| Variable | Border and text | Background |
+| --- | --- | --- |
+| `$color1` | `#326B53` | `#D8F2E4` |
+| `$color2` | `#3E6B3A` | `#DEF2D8` |
+| `$color3` | `#8D4F40` | `#F9DFD8` |
+| `$color4` | `#805080` | `#F3E1F4` |
+| `$color5` | `#66508C` | `#EBE2F7` |
+| `$color6` | `#365F85` | `#DEEFFA` |
+| `$color7` | `#756020` | `#FAF1C8` |
+| `$color8` | `#8A4B70` | `#F9E1EE` |
+| `$color9` | `#4B6670` | `#E1EAED` |
+| `$color10` | `#2F6A65` | `#D9F1EE` |
+| `$color11` | `#665C75` | `#EAE6EF` |
+| `$color12` | `#8A3F52` | `#FBE4E8` |
+| `$color13` | `#536B45` | `#E5EBDD` |
+| `$color14` | `#8A512F` | `#FCE8D5` |
+| `$color15` | `#72613E` | `#EFE8D5` |
+| `$color16` | `#485A91` | `#E2E8FC` |
 
 ## Command line
 
