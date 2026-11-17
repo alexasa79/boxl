@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"image/color"
+	"math"
 	"strings"
 	"testing"
 )
@@ -59,6 +60,81 @@ func TestBuiltInThemes(t *testing.T) {
 				assertThemePair(t, m, "C", theme, 2)
 			}
 		})
+	}
+}
+
+func paletteTestHue(value color.NRGBA) float64 {
+	r, g, b := float64(value.R), float64(value.G), float64(value.B)
+	high, low := max(r, g, b), min(r, g, b)
+	if high == low {
+		return 0
+	}
+	var hue float64
+	switch high {
+	case r:
+		hue = (g - b) / (high - low)
+	case g:
+		hue = 2 + (b-r)/(high-low)
+	case b:
+		hue = 4 + (r-g)/(high-low)
+	}
+	return math.Mod(hue*60+360, 360)
+}
+
+func TestPaletteNeighborsHaveDistinctColors(t *testing.T) {
+	for _, theme := range paletteNames() {
+		t.Run(theme, func(t *testing.T) {
+			palette := lookupPalette(theme)
+			for i, pair := range palette {
+				next := palette[(i+1)%len(palette)]
+				for _, channel := range []struct {
+					name       string
+					first      color.NRGBA
+					second     color.NRGBA
+					separation float64
+				}{
+					{"foreground", pair.foreground, next.foreground, 50},
+					{"background", pair.background, next.background, 30},
+				} {
+					gap := math.Abs(paletteTestHue(channel.first) - paletteTestHue(channel.second))
+					gap = math.Min(gap, 360-gap)
+					r := float64(channel.first.R) - float64(channel.second.R)
+					g := float64(channel.first.G) - float64(channel.second.G)
+					b := float64(channel.first.B) - float64(channel.second.B)
+					if gap < 55 || math.Sqrt(r*r+g*g+b*b) < channel.separation {
+						t.Errorf("pairs %d and %d have similar %s colors", i+1, (i+1)%len(palette)+1, channel.name)
+					}
+				}
+			}
+			for i := 0; i < 3; i++ {
+				for _, value := range []color.NRGBA{palette[i].foreground, palette[i].background} {
+					hue := paletteTestHue(value)
+					matches := (i == 0 && hue >= 180 && hue <= 250) || (i == 1 && hue >= 80 && hue <= 170) || (i == 2 && (hue <= 30 || hue >= 330))
+					if !matches {
+						t.Errorf("pair %d does not follow the blue, green, red opening", i+1)
+					}
+				}
+			}
+		})
+	}
+}
+
+func TestOceanFillsAreDistinctFromPastel(t *testing.T) {
+	for i, pair := range oceanPalette {
+		fill := pair.background
+		high := float64(max(fill.R, fill.G, fill.B))
+		low := float64(min(fill.R, fill.G, fill.B))
+		if high == 0 || (high-low)/high < 0.27 {
+			t.Errorf("ocean pair %d has a washed-out fill", i+1)
+		}
+		for _, pastel := range pastelPalette {
+			r := float64(fill.R) - float64(pastel.background.R)
+			g := float64(fill.G) - float64(pastel.background.G)
+			b := float64(fill.B) - float64(pastel.background.B)
+			if math.Sqrt(r*r+g*g+b*b) < 60 {
+				t.Errorf("ocean pair %d is too close to a pastel fill", i+1)
+			}
+		}
 	}
 }
 

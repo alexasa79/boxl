@@ -22,60 +22,60 @@ func opaquePair(foreground, background uint32) palettePair {
 }
 
 var pastelPalette = colorPalette{
-	opaquePair(0x326b53, 0xd8f2e4), // Seafoam.
+	opaquePair(0x365f85, 0xdeeffa), // Sky.
 	opaquePair(0x3e6b3a, 0xdef2d8), // Mint.
 	opaquePair(0x8d4f40, 0xf9dfd8), // Coral.
-	opaquePair(0x805080, 0xf3e1f4), // Lilac.
-	opaquePair(0x66508c, 0xebe2f7), // Lavender.
-	opaquePair(0x365f85, 0xdeeffa), // Sky.
-	opaquePair(0x756020, 0xfaf1c8), // Butter.
-	opaquePair(0x8a4b70, 0xf9e1ee), // Pink.
 	opaquePair(0x4b6670, 0xe1eaed), // Mist.
-	opaquePair(0x2f6a65, 0xd9f1ee), // Aqua.
-	opaquePair(0x665c75, 0xeae6ef), // Gray violet.
-	opaquePair(0x8a3f52, 0xfbe4e8), // Rose.
-	opaquePair(0x536b45, 0xe5ebdd), // Sage.
 	opaquePair(0x8a512f, 0xfce8d5), // Peach.
+	opaquePair(0x665c75, 0xeae6ef), // Gray violet.
+	opaquePair(0x756020, 0xfaf1c8), // Butter.
+	opaquePair(0x66508c, 0xebe2f7), // Lavender.
 	opaquePair(0x72613e, 0xefe8d5), // Sand.
+	opaquePair(0x805080, 0xf3e1f4), // Lilac.
+	opaquePair(0x326b53, 0xd8f2e4), // Seafoam.
+	opaquePair(0x8a4b70, 0xf9e1ee), // Pink.
+	opaquePair(0x2f6a65, 0xd9f1ee), // Aqua.
+	opaquePair(0x8a3f52, 0xfbe4e8), // Rose.
 	opaquePair(0x485a91, 0xe2e8fc), // Periwinkle.
+	opaquePair(0x536b45, 0xe5ebdd), // Sage.
 }
 
 var earthPalette = colorPalette{
-	opaquePair(0x4f6338, 0xe6ebd8), // Moss.
-	opaquePair(0x92563f, 0xf2dfd3), // Clay.
-	opaquePair(0x4b6063, 0xdfe8e7), // Slate.
+	opaquePair(0x3e637d, 0xd3e1ed), // Dusty blue.
+	opaquePair(0x456533, 0xdde9c6), // Moss.
+	opaquePair(0x9a5141, 0xf3d0c8), // Terracotta.
+	opaquePair(0x6e5569, 0xe9d9e9), // Heather.
 	opaquePair(0x85661f, 0xf0e4ba), // Ochre.
-	opaquePair(0x6e5569, 0xebdddf), // Heather.
-	opaquePair(0x62704b, 0xe7ead8), // Sage.
-	opaquePair(0x9a5141, 0xf3dcd1), // Terracotta.
-	opaquePair(0x7c684a, 0xeee4d2), // Sandstone.
-	opaquePair(0x3d654d, 0xdce9dc), // Pine.
-	opaquePair(0x70523a, 0xeadccc), // Walnut.
-	opaquePair(0x6b6a36, 0xecebcf), // Olive.
-	opaquePair(0x686159, 0xe8e3da), // Stone.
-	opaquePair(0x83513f, 0xeedad2), // Chestnut.
-	opaquePair(0x60714d, 0xe2e9d6), // Lichen.
-	opaquePair(0x526c78, 0xdfe8ed), // Dusty blue.
-	opaquePair(0x775265, 0xebdce4), // Mulberry.
+	opaquePair(0x3d654d, 0xd4e8dc), // Pine.
+	opaquePair(0x775265, 0xebd3df), // Mulberry.
+	opaquePair(0x466570, 0xd5e5eb), // Slate.
+	opaquePair(0x52713d, 0xd9ebc7), // Lichen.
+	opaquePair(0x92563f, 0xf0d4c5), // Clay.
+	opaquePair(0x4f6b5b, 0xd9e8de), // Sage.
+	opaquePair(0x6d527c, 0xe8cfed), // Flint.
+	opaquePair(0x7c684a, 0xf0e5c9), // Sandstone.
+	opaquePair(0x496478, 0xd8e3ed), // Riverstone.
+	opaquePair(0x596b36, 0xe0e8c8), // Olive.
+	opaquePair(0x83513f, 0xeecabd), // Chestnut.
 }
 
 var oceanPalette = colorPalette{
-	opaquePair(0x285e87, 0xdcecf8), // Blue.
-	opaquePair(0x216d70, 0xd6f0ec), // Lagoon.
-	opaquePair(0x465a91, 0xe0e7fa), // Indigo.
-	opaquePair(0x3d7665, 0xddf1e7), // Sea glass.
-	opaquePair(0x315e73, 0xdcecf0), // Deep sea.
-	opaquePair(0x5d5c8f, 0xe8e5f7), // Twilight.
-	opaquePair(0x24787a, 0xd7f2f0), // Aqua.
-	opaquePair(0x536e7a, 0xe1eaee), // Storm.
-	opaquePair(0x3c6f99, 0xe0effb), // Surf.
-	opaquePair(0x48705a, 0xe1eedf), // Kelp.
-	opaquePair(0x3c5d9b, 0xe2eafb), // Cobalt.
-	opaquePair(0x2d746d, 0xd9efe9), // Tidepool.
-	opaquePair(0x5a7380, 0xe7eff1), // Ocean mist.
-	opaquePair(0x365783, 0xdde6f5), // Pelagic.
-	opaquePair(0x426d65, 0xe4f0e9), // Coast.
-	opaquePair(0x50657c, 0xe3eaf2), // Fjord.
+	opaquePair(0x124f78, 0x7ec8f2), // Blue.
+	opaquePair(0x1e542c, 0x88d4a2), // Kelp.
+	opaquePair(0x722e24, 0xf29a8b), // Coral.
+	opaquePair(0x453174, 0xb4a3e8), // Twilight.
+	opaquePair(0x71520b, 0xe8c96a), // Sand.
+	opaquePair(0x0a514e, 0x67cfc3), // Lagoon.
+	opaquePair(0x742348, 0xeca0c7), // Shell.
+	opaquePair(0x23366f, 0x8fa5ec), // Indigo.
+	opaquePair(0x1a5238, 0x80d6b0), // Sea glass.
+	opaquePair(0x6d3d14, 0xedb170), // Sunset.
+	opaquePair(0x0b5864, 0x6bd1df), // Aqua.
+	opaquePair(0x4f226f, 0xc897e0), // Urchin.
+	opaquePair(0x5f4707, 0xd8c66a), // Dune.
+	opaquePair(0x113d5c, 0x70afca), // Deep sea.
+	opaquePair(0x445a19, 0xbdd47a), // Algae.
+	opaquePair(0x6e2a18, 0xe99278), // Starfish.
 }
 
 var availablePalettes = map[string]*colorPalette{

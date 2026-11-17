@@ -96,11 +96,14 @@ The available palettes are:
 | Palette | Colors |
 | --- | --- |
 | `pastel` | Mixed soft colors |
-| `earth` | Moss, clay, ochre, and woodland colors |
-| `ocean` | Blues, teals, sea greens, and indigo |
+| `earth` | Earthy blues, moss, clay, ochre, and violet |
+| `ocean` | Rich, saturated marine colors with coral, shell, and sand accents |
 
-Each contains 16 pairs, with a pale background and a darker foreground for the
-border and text. For example, `#theme:ocean` selects the ocean palette.
+Each contains 16 pairs with a darker foreground for the border and text.
+Pastel uses very pale fills, earth uses muted natural tones, and ocean uses
+stronger mid-tone fills. For example, `#theme:ocean` selects the ocean palette.
+Every palette starts blue-ish, green-ish, then red-ish, and alternates hue
+families throughout the cycle, including the transition from pair 16 to pair 1.
 Top-level boxes start with pair 1. Siblings share the
 current pair, and children start with the next pair. After pair 16, the palette
 wraps to pair 1.
@@ -151,22 +154,22 @@ The `pastel` pairs are:
 
 | Variable | Border and text | Background |
 | --- | --- | --- |
-| `$color1` | `#326B53` | `#D8F2E4` |
+| `$color1` | `#365F85` | `#DEEFFA` |
 | `$color2` | `#3E6B3A` | `#DEF2D8` |
 | `$color3` | `#8D4F40` | `#F9DFD8` |
-| `$color4` | `#805080` | `#F3E1F4` |
-| `$color5` | `#66508C` | `#EBE2F7` |
-| `$color6` | `#365F85` | `#DEEFFA` |
+| `$color4` | `#4B6670` | `#E1EAED` |
+| `$color5` | `#8A512F` | `#FCE8D5` |
+| `$color6` | `#665C75` | `#EAE6EF` |
 | `$color7` | `#756020` | `#FAF1C8` |
-| `$color8` | `#8A4B70` | `#F9E1EE` |
-| `$color9` | `#4B6670` | `#E1EAED` |
-| `$color10` | `#2F6A65` | `#D9F1EE` |
-| `$color11` | `#665C75` | `#EAE6EF` |
-| `$color12` | `#8A3F52` | `#FBE4E8` |
-| `$color13` | `#536B45` | `#E5EBDD` |
-| `$color14` | `#8A512F` | `#FCE8D5` |
-| `$color15` | `#72613E` | `#EFE8D5` |
-| `$color16` | `#485A91` | `#E2E8FC` |
+| `$color8` | `#66508C` | `#EBE2F7` |
+| `$color9` | `#72613E` | `#EFE8D5` |
+| `$color10` | `#805080` | `#F3E1F4` |
+| `$color11` | `#326B53` | `#D8F2E4` |
+| `$color12` | `#8A4B70` | `#F9E1EE` |
+| `$color13` | `#2F6A65` | `#D9F1EE` |
+| `$color14` | `#8A3F52` | `#FBE4E8` |
+| `$color15` | `#485A91` | `#E2E8FC` |
+| `$color16` | `#536B45` | `#E5EBDD` |
 
 ## Command line
 
